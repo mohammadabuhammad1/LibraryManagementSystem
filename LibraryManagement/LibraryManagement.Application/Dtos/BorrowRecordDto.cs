@@ -4,9 +4,10 @@
     {
         public int Id { get; set; }
         public int BookId { get; set; }
-        public int MemberId { get; set; }
+        public string UserId { get; set; }
+        //public int MemberId { get; set; }
         public string BookTitle { get; set; } = string.Empty;
-        public string MemberName { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
         public DateTime BorrowDate { get; set; }
         public DateTime DueDate { get; set; }
         public DateTime? ReturnDate { get; set; }

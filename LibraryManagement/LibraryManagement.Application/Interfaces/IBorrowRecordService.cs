@@ -6,9 +6,11 @@ namespace LibraryManagement.Application.Interfaces
     {
         Task<BorrowRecordDto> BorrowBookAsync(CreateBorrowRecordDto borrowDto);
         Task<BorrowRecordDto> ReturnBookAsync(ReturnBookDto returnDto);
-        Task<IEnumerable<BorrowRecordDto>> GetMemberBorrowHistoryAsync(int memberId);
+        Task<IEnumerable<BorrowRecordDto>> GetUserBorrowHistoryAsync(string userId);
         Task<IEnumerable<BorrowRecordDto>> GetOverdueBooksAsync();
-        Task<IEnumerable<BorrowRecordDto>> GetActiveBorrowsByMemberAsync(int memberId);
+        Task<IEnumerable<BorrowRecordDto>> GetActiveBorrowsByUserAsync(string userId); 
         Task<decimal> CalculateFineAsync(int borrowRecordId);
+        Task<bool> CanUserViewFineAsync(int borrowRecordId, string userId);
+
     }
 }

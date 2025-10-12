@@ -2,6 +2,7 @@
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
+using Microsoft.AspNetCore.Identity;
 
 namespace LibraryManagement.Application.Services
 {
@@ -9,27 +10,27 @@ namespace LibraryManagement.Application.Services
     {
         private readonly IBorrowRecordRepository _borrowRecordRepository;
         private readonly IBookRepository _bookRepository;
-        private readonly IMemberRepository _memberRepository;
+        private readonly UserManager<ApplicationUser> _userManager;
         private const decimal FINE_PER_DAY = 0.50m;
 
         public BorrowRecordService(
             IBorrowRecordRepository borrowRecordRepository,
             IBookRepository bookRepository,
-            IMemberRepository memberRepository)
+            UserManager<ApplicationUser> userManager)
         {
             _borrowRecordRepository = borrowRecordRepository;
             _bookRepository = bookRepository;
-            _memberRepository = memberRepository;
+            _userManager = userManager;
         }
 
         public async Task<BorrowRecordDto> BorrowBookAsync(CreateBorrowRecordDto borrowDto)
         {
-            var member = await _memberRepository.GetByIdAsync(borrowDto.MemberId);
-            if (member == null)
-                throw new Exception($"Member with ID {borrowDto.MemberId} not found.");
+            var user = await _userManager.FindByIdAsync(borrowDto.UserId);
+            if (user == null)
+                throw new Exception($"User with ID {borrowDto.UserId} not found.");
 
-            if (!member.IsActive)
-                throw new Exception($"Member {member.Name} is not active.");
+            if (!user.IsActive)
+                throw new Exception($"User {user.Name} is not active.");
 
             var book = await _bookRepository.GetByIdAsync(borrowDto.BookId);
             if (book == null)
@@ -39,14 +40,14 @@ namespace LibraryManagement.Application.Services
                 throw new Exception($"No copies available for '{book.Title}'.");
 
             var existingBorrow = await _borrowRecordRepository
-                .GetActiveBorrowByBookAndMemberAsync(borrowDto.BookId, borrowDto.MemberId);
+                .GetActiveBorrowByBookAndUserAsync(borrowDto.BookId, borrowDto.UserId);
             if (existingBorrow != null)
-                throw new Exception($"Member already has '{book.Title}' borrowed.");
+                throw new Exception($"User already has '{book.Title}' borrowed.");
 
             var borrowRecord = new BorrowRecord
             {
                 BookId = borrowDto.BookId,
-                MemberId = borrowDto.MemberId,
+                UserId = borrowDto.UserId,
                 BorrowDate = DateTime.UtcNow,
                 DueDate = DateTime.UtcNow.AddDays(borrowDto.BorrowDurationDays),
                 IsReturned = false,
@@ -60,7 +61,7 @@ namespace LibraryManagement.Application.Services
             await _bookRepository.UpdateAsync(book);
 
             createdRecord.Book = book;
-            createdRecord.Member = member;
+            createdRecord.User = user;
 
             return MapToBorrowRecordDto(createdRecord);
         }
@@ -68,10 +69,10 @@ namespace LibraryManagement.Application.Services
         public async Task<BorrowRecordDto> ReturnBookAsync(ReturnBookDto returnDto)
         {
             var borrowRecord = await _borrowRecordRepository
-                .GetActiveBorrowByBookAndMemberAsync(returnDto.BookId, returnDto.MemberId);
+                .GetActiveBorrowByBookAndUserAsync(returnDto.BookId, returnDto.UserId);
 
             if (borrowRecord == null)
-                throw new Exception($"No active borrow record found for Book {returnDto.BookId} and Member {returnDto.MemberId}");
+                throw new Exception($"No active borrow record found for Book {returnDto.BookId} and User {returnDto.UserId}");
 
             borrowRecord.ReturnDate = DateTime.UtcNow;
             borrowRecord.IsReturned = true;
@@ -97,16 +98,16 @@ namespace LibraryManagement.Application.Services
                 await _bookRepository.UpdateAsync(book);
             }
 
-            var member = await _memberRepository.GetByIdAsync(returnDto.MemberId);
+            var user = await _userManager.FindByIdAsync(returnDto.UserId);
             borrowRecord.Book = book!;
-            borrowRecord.Member = member!;
+            borrowRecord.User = user!;
 
             return MapToBorrowRecordDto(borrowRecord);
         }
 
-        public async Task<IEnumerable<BorrowRecordDto>> GetMemberBorrowHistoryAsync(int memberId)
+        public async Task<IEnumerable<BorrowRecordDto>> GetUserBorrowHistoryAsync(string userId)
         {
-            var records = await _borrowRecordRepository.GetBorrowHistoryByMemberAsync(memberId);
+            var records = await _borrowRecordRepository.GetBorrowHistoryByUserAsync(userId);
             return records.Select(MapToBorrowRecordDto);
         }
 
@@ -116,9 +117,9 @@ namespace LibraryManagement.Application.Services
             return overdueRecords.Select(MapToBorrowRecordDto);
         }
 
-        public async Task<IEnumerable<BorrowRecordDto>> GetActiveBorrowsByMemberAsync(int memberId)
+        public async Task<IEnumerable<BorrowRecordDto>> GetActiveBorrowsByUserAsync(string userId)
         {
-            var activeBorrows = await _borrowRecordRepository.GetActiveBorrowsByMemberAsync(memberId);
+            var activeBorrows = await _borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
             return activeBorrows.Select(MapToBorrowRecordDto);
         }
 
@@ -142,15 +143,21 @@ namespace LibraryManagement.Application.Services
             return 0;
         }
 
+        public async Task<bool> CanUserViewFineAsync(int borrowRecordId, string userId)
+        {
+            var userBorrowHistory = await _borrowRecordRepository.GetBorrowHistoryByUserAsync(userId);
+            return userBorrowHistory.Any(br => br.Id == borrowRecordId);
+        }
+
         private static BorrowRecordDto MapToBorrowRecordDto(BorrowRecord record)
         {
             return new BorrowRecordDto
             {
                 Id = record.Id,
                 BookId = record.BookId,
-                MemberId = record.MemberId,
+                UserId = record.UserId,
                 BookTitle = record.Book?.Title ?? string.Empty,
-                MemberName = record.Member?.Name ?? string.Empty,
+                UserName = record.User?.Name ?? string.Empty,
                 BorrowDate = record.BorrowDate,
                 DueDate = record.DueDate,
                 ReturnDate = record.ReturnDate,

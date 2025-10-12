@@ -9,12 +9,12 @@ namespace LibraryManagement.Infrastructure.Repositories
     {
         public BorrowRecordRepository(LibraryDbContext context) : base(context) { }
 
-        public async Task<IEnumerable<BorrowRecord>> GetActiveBorrowsByMemberAsync(int memberId)
+        public async Task<IEnumerable<BorrowRecord>> GetActiveBorrowsByUserAsync(string userId)
         {
             return await _dbSet
                 .Include(br => br.Book)
-                .Include(br => br.Member)
-                .Where(br => br.MemberId == memberId && !br.IsReturned)
+                .Include(br => br.User)
+                .Where(br => br.UserId == userId && !br.IsReturned)
                 .ToListAsync();
         }
 
@@ -22,25 +22,25 @@ namespace LibraryManagement.Infrastructure.Repositories
         {
             return await _dbSet
                 .Include(br => br.Book)
-                .Include(br => br.Member)
+                .Include(br => br.User)
                 .Where(br => !br.IsReturned && br.DueDate < DateTime.UtcNow)
                 .ToListAsync();
         }
 
-        public async Task<BorrowRecord?> GetActiveBorrowByBookAndMemberAsync(int bookId, int memberId)
+        public async Task<BorrowRecord?> GetActiveBorrowByBookAndUserAsync(int bookId, string userId)
         {
             return await _dbSet
                 .Include(br => br.Book)
-                .Include(br => br.Member)
-                .FirstOrDefaultAsync(br => br.BookId == bookId && br.MemberId == memberId && !br.IsReturned);
+                .Include(br => br.User)
+                .FirstOrDefaultAsync(br => br.BookId == bookId && br.UserId == userId && !br.IsReturned);
         }
 
-        public async Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByMemberAsync(int memberId)
+        public async Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByUserAsync(string userId)
         {
             return await _dbSet
                 .Include(br => br.Book)
-                .Include(br => br.Member)
-                .Where(br => br.MemberId == memberId)
+                .Include(br => br.User)
+                .Where(br => br.UserId == userId)
                 .OrderByDescending(br => br.BorrowDate)
                 .ToListAsync();
         }
@@ -49,7 +49,7 @@ namespace LibraryManagement.Infrastructure.Repositories
         {
             return await _dbSet
                 .Include(br => br.Book)
-                .Include(br => br.Member)
+                .Include(br => br.User)
                 .Where(br => br.BookId == bookId)
                 .OrderByDescending(br => br.BorrowDate)
                 .ToListAsync();

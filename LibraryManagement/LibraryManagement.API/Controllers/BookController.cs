@@ -1,12 +1,14 @@
 ﻿using LibraryManagement.API.Errors;
 using LibraryManagement.Application.Dtos;
 using LibraryManagement.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryManagement.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class BooksController : ControllerBase
     {
         private readonly IBookService _bookService;
@@ -17,8 +19,9 @@ namespace LibraryManagement.API.Controllers
         }
 
         // Get all books
-        [HttpGet]
+        [HttpGet("GetAllBooks")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous] 
         public async Task<ActionResult<IEnumerable<BookDto>>> GetAllBooks()
         {
             var books = await _bookService.GetAllBooksAsync();
@@ -26,9 +29,10 @@ namespace LibraryManagement.API.Controllers
         }
 
         // Get a book by ID
-        [HttpGet("{id}")]
+        [HttpGet("GetBookById/{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [AllowAnonymous] 
         public async Task<ActionResult<BookDto>> GetBookById(int id)
         {
             var book = await _bookService.GetBookByIdAsync(id);
@@ -39,9 +43,10 @@ namespace LibraryManagement.API.Controllers
         }
 
         // Create a new book
-        [HttpPost]
+        [HttpPost("CreateBook")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [Authorize(Roles = "Admin,Librarian")] 
         public async Task<ActionResult<BookDto>> CreateBook([FromBody] CreateBookDto createBookDto)
         {
             try
@@ -55,11 +60,11 @@ namespace LibraryManagement.API.Controllers
             }
         }
 
-        // Update an existing book by ID
-        [HttpPut("{id}")]
+        [HttpPut("UpdateBook/{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [Authorize(Roles = "Admin,Librarian")] 
         public async Task<ActionResult<BookDto>> UpdateBook(int id, [FromBody] UpdateBookDto updateBookDto)
         {
             try
@@ -77,9 +82,10 @@ namespace LibraryManagement.API.Controllers
         }
 
         // Delete a book by ID
-        [HttpDelete("{id}")]
+        [HttpDelete("DeleteBook/{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [Authorize(Roles = "Admin")] // Only Admin can delete books
         public async Task<ActionResult> DeleteBook(int id)
         {
             var deleted = await _bookService.DeleteBookAsync(id);

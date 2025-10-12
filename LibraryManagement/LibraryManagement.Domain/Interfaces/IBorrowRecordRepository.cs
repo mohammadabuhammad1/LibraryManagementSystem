@@ -9,10 +9,10 @@ namespace LibraryManagement.Domain.Interfaces
 {
     public interface IBorrowRecordRepository : IGenericRepository<BorrowRecord>
     {
-        Task<IEnumerable<BorrowRecord>> GetActiveBorrowsByMemberAsync(int memberId);
+        Task<IEnumerable<BorrowRecord>> GetActiveBorrowsByUserAsync(string userId);
         Task<IEnumerable<BorrowRecord>> GetOverdueBorrowsAsync();
-        Task<BorrowRecord?> GetActiveBorrowByBookAndMemberAsync(int bookId, int memberId);
-        Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByMemberAsync(int memberId);
+        Task<BorrowRecord?> GetActiveBorrowByBookAndUserAsync(int bookId, string userId);
+        Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByUserAsync(string userId);
         Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByBookAsync(int bookId);
     }
 }

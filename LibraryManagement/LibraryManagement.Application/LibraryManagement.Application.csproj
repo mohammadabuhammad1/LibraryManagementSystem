@@ -1,6 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="Dtos\CreateMemberDto.cs" />
+    <Compile Remove="Dtos\MemberDto.cs" />
+    <Compile Remove="Dtos\UpdateMemberDto.cs" />
+    <Compile Remove="Interfaces\IMemberService.cs" />
+    <Compile Remove="Services\MemberService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LibraryManagement.Domain\LibraryManagement.Domain.csproj" />
   </ItemGroup>
 

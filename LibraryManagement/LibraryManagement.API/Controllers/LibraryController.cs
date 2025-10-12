@@ -2,12 +2,14 @@
 using LibraryManagement.Application.Dtos;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryManagement.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class LibrariesController : ControllerBase
     {
         private readonly ILibraryRepository _libraryRepository;
@@ -19,9 +21,9 @@ namespace LibraryManagement.API.Controllers
             _bookRepository = bookRepository;
         }
 
-        // Get all libraries
         [HttpGet("GetAllLibraries")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [AllowAnonymous] 
         public async Task<ActionResult<IEnumerable<LibraryDto>>> GetAllLibraries()
         {
             var libraries = await _libraryRepository.GetAllAsync();
@@ -29,10 +31,10 @@ namespace LibraryManagement.API.Controllers
             return Ok(libraryDtos);
         }
 
-        // Get a library by ID
         [HttpGet("GetLibraryById/{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [AllowAnonymous]
         public async Task<ActionResult<LibraryDetailsDto>> GetLibraryById(int id)
         {
             var library = await _libraryRepository.GetByIdAsync(id);
@@ -43,10 +45,10 @@ namespace LibraryManagement.API.Controllers
             return Ok(MapToLibraryDetailsDto(library, books));
         }
 
-        // Create a new library
         [HttpPost("CreateLibrary")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [Authorize(Roles = "Admin")] 
         public async Task<ActionResult<LibraryDto>> CreateLibrary([FromBody] CreateLibraryDto createLibraryDto)
         {
             try
@@ -71,11 +73,11 @@ namespace LibraryManagement.API.Controllers
             }
         }
 
-        // Update an existing library
         [HttpPut("UpdateLibrary/{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [Authorize(Roles = "Admin,Librarian")] 
         public async Task<ActionResult<LibraryDto>> UpdateLibrary(int id, [FromBody] UpdateLibraryDto updateLibraryDto)
         {
             try
@@ -97,17 +99,16 @@ namespace LibraryManagement.API.Controllers
             }
         }
 
-        // Delete a library by ID
         [HttpDelete("DeleteLibrary/{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [Authorize(Roles = "Admin")] 
         public async Task<ActionResult> DeleteLibrary(int id)
         {
             var library = await _libraryRepository.GetByIdAsync(id);
             if (library == null)
                 return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
 
-            // Check if library has books
             var books = await _bookRepository.GetBooksByLibraryAsync(id);
             if (books.Any())
                 return BadRequest(new ApiResponse(400, "Cannot delete library that contains books"));
@@ -116,10 +117,10 @@ namespace LibraryManagement.API.Controllers
             return NoContent();
         }
 
-        // Add a book to a library
         [HttpPost("AddBookToLibrary/{libraryId}/{bookId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [Authorize(Roles = "Admin,Librarian")] 
         public async Task<ActionResult<BookDto>> AddBookToLibrary(int libraryId, int bookId)
         {
             try
@@ -151,7 +152,7 @@ namespace LibraryManagement.API.Controllers
                 Name = library.Name,
                 Location = library.Location,
                 Description = library.Description,
-                BookCount = library.Books.Count,
+                BookCount = library.Books?.Count ?? 0,
                 CreatedAt = library.CreatedAt
             };
         }
@@ -180,7 +181,7 @@ namespace LibraryManagement.API.Controllers
                 PublishedYear = book.PublishedYear,
                 TotalCopies = book.TotalCopies,
                 CopiesAvailable = book.CopiesAvailable,
-                LibraryId = (int)book.LibraryId
+                LibraryId = book.LibraryId ?? 0
             };
         }
     }
