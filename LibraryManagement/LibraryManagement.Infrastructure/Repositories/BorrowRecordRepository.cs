@@ -54,5 +54,13 @@ namespace LibraryManagement.Infrastructure.Repositories
                 .OrderByDescending(br => br.BorrowDate)
                 .ToListAsync();
         }
+
+        public async Task<BorrowRecord?> GetBorrowRecordWithDetailsAsync(int borrowRecordId)
+        {
+            return await _dbSet
+                .Include(br => br.Book)
+                .Include(br => br.User)
+                .FirstOrDefaultAsync(br => br.Id == borrowRecordId);
+        }
     }
 }

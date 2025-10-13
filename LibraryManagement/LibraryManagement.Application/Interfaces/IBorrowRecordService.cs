@@ -12,5 +12,8 @@ namespace LibraryManagement.Application.Interfaces
         Task<decimal> CalculateFineAsync(int borrowRecordId);
         Task<bool> CanUserViewFineAsync(int borrowRecordId, string userId);
 
+        Task<IEnumerable<BorrowRecordDto>> GetBorrowHistoryByBookAsync(int bookId);
+        Task<BorrowRecordDto> RenewBorrowAsync(int borrowRecordId, int additionalDays, string userId);
+
     }
 }

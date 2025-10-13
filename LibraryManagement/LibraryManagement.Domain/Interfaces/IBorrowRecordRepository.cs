@@ -14,5 +14,8 @@ namespace LibraryManagement.Domain.Interfaces
         Task<BorrowRecord?> GetActiveBorrowByBookAndUserAsync(int bookId, string userId);
         Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByUserAsync(string userId);
         Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByBookAsync(int bookId);
+
+        Task<BorrowRecord?> GetBorrowRecordWithDetailsAsync(int borrowRecordId);
+
     }
 }

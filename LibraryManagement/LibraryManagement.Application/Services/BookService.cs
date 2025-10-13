@@ -37,6 +37,7 @@ namespace LibraryManagement.Application.Services
                 TotalCopies = createBookDto.TotalCopies,
                 CopiesAvailable = createBookDto.TotalCopies,
                 CreatedAt = DateTime.UtcNow
+                
             };
 
             var createdBook = await _bookRepository.AddAsync(book);
@@ -64,6 +65,29 @@ namespace LibraryManagement.Application.Services
 
             await _bookRepository.DeleteAsync(book);
             return true;
+        }
+
+        public async Task<BookDto?> GetBookByIsbnAsync(string isbn)
+        {
+            var book = await _bookRepository.GetByIsbnAsync(isbn);
+            return book == null ? null : MapToBookDto(book);
+        }
+
+        public async Task<IEnumerable<BookDto>> GetAvailableBooksAsync()
+        {
+            var books = await _bookRepository.GetAvailableBooksAsync();
+            return books.Select(MapToBookDto);
+        }
+
+        public async Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId)
+        {
+            var books = await _bookRepository.GetBooksByLibraryAsync(libraryId);
+            return books.Select(MapToBookDto);
+        }
+
+        public async Task<bool> BookExistsAsync(int id)
+        {
+            return await _bookRepository.ExistsAsync(id);
         }
 
         private static BookDto MapToBookDto(Book book)

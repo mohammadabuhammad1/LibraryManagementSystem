@@ -9,7 +9,7 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__PostgreSQL=Host=postgres.db;Port=5432;Username=postgres;Password=Admin1234;Database=LibraryManagement
+      - ConnectionStrings__PostgreSQL=Host=postgres.db;Port=5432;Username=postgres;Password=1234;Database=LibraryManagement
     depends_on:
       - db
     networks:
@@ -20,7 +20,7 @@ services:
     hostname: postgres.db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Admin1234 
+      POSTGRES_PASSWORD: 1234 
       POSTGRES_DB: LibraryManagement
     ports:
       - "5432:5432"

@@ -9,5 +9,10 @@ namespace LibraryManagement.Application.Interfaces
         Task<BookDto> CreateBookAsync(CreateBookDto createBookDto);
         Task<BookDto> UpdateBookAsync(int id, UpdateBookDto updateBookDto);
         Task<bool> DeleteBookAsync(int id);
+
+        Task<BookDto?> GetBookByIsbnAsync(string isbn);
+        Task<IEnumerable<BookDto>> GetAvailableBooksAsync();
+        Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId);
+        Task<bool> BookExistsAsync(int id);
     }
 }

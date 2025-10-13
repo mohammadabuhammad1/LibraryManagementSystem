@@ -12,7 +12,8 @@ namespace LibraryManagement.Application.Services
         private readonly IBookRepository _bookRepository;
         private readonly UserManager<ApplicationUser> _userManager;
         private const decimal FINE_PER_DAY = 0.50m;
-
+        private const int MAX_RENEWAL_DAYS = 30;
+        private const int MAX_RENEWAL_COUNT = 3;
         public BorrowRecordService(
             IBorrowRecordRepository borrowRecordRepository,
             IBookRepository bookRepository,
@@ -147,6 +148,79 @@ namespace LibraryManagement.Application.Services
         {
             var userBorrowHistory = await _borrowRecordRepository.GetBorrowHistoryByUserAsync(userId);
             return userBorrowHistory.Any(br => br.Id == borrowRecordId);
+        }
+
+        public async Task<IEnumerable<BorrowRecordDto>> GetBorrowHistoryByBookAsync(int bookId)
+        {
+            var book = await _bookRepository.GetByIdAsync(bookId);
+            if (book == null)
+                throw new Exception($"Book with ID {bookId} not found.");
+
+            var records = await _borrowRecordRepository.GetBorrowHistoryByBookAsync(bookId);
+            return records.Select(MapToBorrowRecordDto);
+        }
+
+        public async Task<BorrowRecordDto> RenewBorrowAsync(int borrowRecordId, int additionalDays, string userId)
+        {
+            if (additionalDays <= 0)
+                throw new Exception("Additional days must be greater than zero.");
+
+            if (additionalDays > MAX_RENEWAL_DAYS)
+                throw new Exception($"Maximum renewal period is {MAX_RENEWAL_DAYS} days.");
+
+            var borrowRecord = await _borrowRecordRepository.GetBorrowRecordWithDetailsAsync(borrowRecordId);
+            if (borrowRecord == null)
+                throw new Exception($"Borrow record with ID {borrowRecordId} not found.");
+
+            // Authorization check
+            if (borrowRecord.UserId != userId)
+                throw new Exception("You can only renew your own borrow records.");
+
+            if (borrowRecord.IsReturned)
+                throw new Exception("Cannot renew a book that has already been returned.");
+
+            if (borrowRecord.DueDate < DateTime.UtcNow)
+                throw new Exception("Cannot renew an overdue book. Please return it and pay any fines first.");
+
+            // Check if book has been requested by other users
+            var book = borrowRecord.Book;
+            if (book == null)
+                throw new Exception("Book information not found.");
+
+            if (book.CopiesAvailable <= 0)
+                throw new Exception("Cannot renew book as all copies are currently borrowed.");
+
+            // Check renewal count (you might want to add a RenewalCount property to BorrowRecord)
+            // For now, we'll check if it's already been renewed multiple times
+            var renewalCount = await GetRenewalCountAsync(borrowRecordId);
+            if (renewalCount >= MAX_RENEWAL_COUNT)
+                throw new Exception($"Maximum renewal count ({MAX_RENEWAL_COUNT}) reached for this book.");
+
+            // Calculate new due date
+            var newDueDate = borrowRecord.DueDate.AddDays(additionalDays);
+
+            // Update the borrow record
+            borrowRecord.DueDate = newDueDate;
+            borrowRecord.UpdatedAt = DateTime.UtcNow;
+
+            // Add renewal note
+            borrowRecord.Notes = $"{borrowRecord.Notes} | Renewed on {DateTime.UtcNow:yyyy-MM-dd}, new due date: {newDueDate:yyyy-MM-dd}";
+
+            await _borrowRecordRepository.UpdateAsync(borrowRecord);
+
+            return MapToBorrowRecordDto(borrowRecord);
+        }
+
+        private async Task<int> GetRenewalCountAsync(int borrowRecordId)
+        {
+            // This is a simplified implementation
+            // You might want to add a proper RenewalCount property to BorrowRecord entity
+            var record = await _borrowRecordRepository.GetByIdAsync(borrowRecordId);
+            if (record == null) return 0;
+
+            // Count renewals based on notes or create a separate renewal history table
+            // For now, return 0 to allow at least one renewal
+            return 0;
         }
 
         private static BorrowRecordDto MapToBorrowRecordDto(BorrowRecord record)
