@@ -25,50 +25,26 @@ namespace LibraryManagement.Infrastructure.Data
             try
             {
                 var context = serviceProvider.GetRequiredService<LibraryDbContext>();
-                await context.Database.MigrateAsync();
-                _logger.LogInformation("Main database migrated successfully");
 
+                // Apply migrations
+                await context.Database.MigrateAsync();
+                _logger.LogInformation("Database migrated successfully");
+
+                // Seed roles and super admin
                 var roleSeeder = serviceProvider.GetRequiredService<RoleSeeder>();
-                await roleSeeder.SeedRolesAsync();     
+                await roleSeeder.SeedRolesAsync();
                 await roleSeeder.SeedSuperAdminAsync();
 
-                await SeedLibraryDataAsync(context);
+                // Seed initial data
+                var dataSeeder = serviceProvider.GetRequiredService<DataSeeder>();
+                await dataSeeder.SeedAsync();
 
-                _logger.LogInformation("Database initialization completed successfully");
+                _logger.LogInformation("Database initialization completed successfully.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while initializing the database");
+                _logger.LogError(ex, "An error occurred while initializing the database.");
                 throw;
-            }
-        }
-
-        private async Task SeedLibraryDataAsync(LibraryDbContext context)
-        {
-            // Seed initial libraries if none exist
-            if (!await context.Libraries.AnyAsync())
-            {
-                var libraries = new List<Library>
-                {
-                    new Library
-                    {
-                        Name = "Main Library",
-                        Location = "City Center",
-                        Description = "Main public library",
-                        CreatedAt = DateTime.UtcNow
-                    },
-                    new Library
-                    {
-                        Name = "Community Library",
-                        Location = "West District",
-                        Description = "Community branch library",
-                        CreatedAt = DateTime.UtcNow
-                    }
-                };
-
-                await context.Libraries.AddRangeAsync(libraries);
-                await context.SaveChangesAsync();
-                _logger.LogInformation("Initial libraries seeded");
             }
         }
     }

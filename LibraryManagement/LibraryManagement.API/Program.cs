@@ -99,8 +99,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 // Role services
 builder.Services.AddScoped<RoleManager<IdentityRole>>();
 builder.Services.AddScoped<IRoleService, RoleService>();
-
 builder.Services.AddScoped<RoleSeeder>();
+
+// Data seeding
+builder.Services.AddScoped<DataSeeder>();
+builder.Services.AddScoped<DatabaseInitializer>();
 
 var app = builder.Build();
 
@@ -118,6 +121,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Run database initialization
 await InitializeDatabase(app);
 
 app.Run();
@@ -129,19 +133,15 @@ async Task InitializeDatabase(WebApplication app)
 
     try
     {
-        var context = services.GetRequiredService<LibraryDbContext>();
-        await context.Database.MigrateAsync();
-
-        var roleSeeder = services.GetRequiredService<RoleSeeder>();
-        await roleSeeder.SeedRolesAsync();      
-        await roleSeeder.SeedSuperAdminAsync(); 
+        var dbInitializer = services.GetRequiredService<DatabaseInitializer>();
+        await dbInitializer.InitializeAsync();
 
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Database initialized successfully");
+        logger.LogInformation("Database initialization and seeding completed successfully.");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing the database");
+        logger.LogError(ex, "An error occurred while initializing and seeding the database");
     }
 }
