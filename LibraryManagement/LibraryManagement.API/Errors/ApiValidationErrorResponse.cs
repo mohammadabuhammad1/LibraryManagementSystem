@@ -1,10 +1,11 @@
-﻿namespace LibraryManagement.API.Errors
+﻿namespace LibraryManagement.API.Errors;
+
+internal sealed class ApiValidationErrorResponse : ApiResponse
 {
-    public class ApiValidationErrorResponse : ApiResponse
+    public ApiValidationErrorResponse() : base(400)
     {
-        public ApiValidationErrorResponse() : base(400)
-        {
-        }
-        public IEnumerable<string> Errors { get; set; }
+        Errors = new List<string>();
     }
+
+    public IEnumerable<string> Errors { get; set; }
 }

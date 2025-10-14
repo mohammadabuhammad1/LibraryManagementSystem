@@ -13,13 +13,29 @@ namespace LibraryManagement.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-internal class AccountController(
-    UserManager<ApplicationUser> userManager,
-    SignInManager<ApplicationUser> signInManager,
-    ITokenService tokenService,
-    IBorrowRecordService borrowRecordService,
-    IRoleService roleService) : BaseApiController(userManager: userManager)
+internal sealed class AccountController : BaseApiController
 {
+    private readonly SignInManager<ApplicationUser> signInManager;
+    private readonly ITokenService tokenService;
+    private readonly IBorrowRecordService borrowRecordService;
+    private readonly IRoleService roleService;
+    private readonly UserManager<ApplicationUser> userManager;
+
+    public AccountController(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        ITokenService tokenService,
+        IBorrowRecordService borrowRecordService,
+        IRoleService roleService)
+        : base(userManager)
+    {
+        this.userManager = userManager;
+        this.signInManager = signInManager;
+        this.tokenService = tokenService;
+        this.borrowRecordService = borrowRecordService;
+        this.roleService = roleService;
+    }
+
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
@@ -37,15 +53,21 @@ internal class AccountController(
         if (!user.IsActive)
             return Unauthorized("Account is deactivated. Please contact administrator.");
 
-        Microsoft.AspNetCore.Identity.SignInResult result = await signInManager.CheckPasswordSignInAsync(user, loginDto.Password ?? string.Empty, false).ConfigureAwait(false);
+        Microsoft.AspNetCore.Identity.SignInResult result = await signInManager
+            .CheckPasswordSignInAsync(user, loginDto.Password ?? string.Empty, false)
+            .ConfigureAwait(false);
 
         if (!result.Succeeded)
             return Unauthorized("Invalid email or password");
 
-        IList<string> roles = await userManager.GetRolesAsync(user).ConfigureAwait(false);
-        string token = await tokenService.CreateToken(user).ConfigureAwait(false);
+        IList<string> roles = await userManager
+            .GetRolesAsync(user)
+            .ConfigureAwait(false);
 
-        // Set token in cookie for web applications (optional)
+        string token = await tokenService
+            .CreateToken(user)
+            .ConfigureAwait(false);
+
         Response.Cookies.Append("access_token", token, new CookieOptions
         {
             HttpOnly = true,
@@ -59,7 +81,7 @@ internal class AccountController(
         IEnumerable<BorrowRecordDto> overdueBooks = await borrowRecordService.GetOverdueBooksAsync().ConfigureAwait(false);
         int userOverdueBooks = overdueBooks.Count(b => b.UserId == user.Id);
 
-        UserDto userDto = new UserDto
+        UserDto userDto = new()
         {
             Id = user.Id,
             Email = user.Email ?? string.Empty,
@@ -102,7 +124,7 @@ internal class AccountController(
             return BadRequest("Email address is already in use");
         }
 
-        ApplicationUser user = new ApplicationUser
+        ApplicationUser user = new()
         {
             Name = registerDto.Name,
             Email = registerDto.Email,

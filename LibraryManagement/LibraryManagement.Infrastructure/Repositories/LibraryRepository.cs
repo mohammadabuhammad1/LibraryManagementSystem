@@ -11,7 +11,8 @@ public class LibraryRepository : GenericRepository<Library>, ILibraryRepository
 
     public async Task<Library?> GetByNameAsync(string name)
     {
-        return await _dbSet.FirstOrDefaultAsync(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ConfigureAwait(false);
+        return await Context.Set<Library>()
+            .FirstOrDefaultAsync(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ConfigureAwait(false);
 
         //  Uses StringComparison.OrdinalIgnoreCase for case-insensitive comparison
         //  No string allocation (unlike ToLower/ToUpper which create new strings)
@@ -23,7 +24,7 @@ public class LibraryRepository : GenericRepository<Library>, ILibraryRepository
 
     public async Task<IEnumerable<Library>> GetLibrariesWithBooksAsync()
     {
-        return await _dbSet
+        return await Context.Set<Library>()
             .Include(l => l.Books)
             .ToListAsync().ConfigureAwait(false);
     }

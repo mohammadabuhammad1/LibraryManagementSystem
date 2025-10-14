@@ -3,34 +3,41 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-namespace LibraryManagement.API.Extensions
+namespace LibraryManagement.API.Extensions;
+
+internal static class UserManagerExtensions
 {
-    public static class UserManagerExtensions
+    public static async Task<ApplicationUser?> FindByEmailFromClaimsPrincipal(
+        this UserManager<ApplicationUser> userManager, ClaimsPrincipal user)
     {
-        public static async Task<ApplicationUser> FindByEmailFromClaimsPrincipal(
-            this UserManager<ApplicationUser> userManager, ClaimsPrincipal user)
-        {
-            var email = user?.FindFirstValue(ClaimTypes.Email);
+        ArgumentNullException.ThrowIfNull(userManager);
+        ArgumentNullException.ThrowIfNull(user);
 
-            if (string.IsNullOrEmpty(email))
-                return null;
+        string? email = user.FindFirstValue(ClaimTypes.Email);
 
-            return await userManager.Users
-                .SingleOrDefaultAsync(x => x.Email == email);
-        }
+        if (string.IsNullOrEmpty(email))
+            return null;
 
-        public static async Task<ApplicationUser> FindUserByClaimsPrincipleWithBorrowRecords(
-            this UserManager<ApplicationUser> userManager, ClaimsPrincipal user)
-        {
-            var email = user?.FindFirstValue(ClaimTypes.Email);
+        return await userManager.Users
+            .SingleOrDefaultAsync(x => x.Email == email)
+            .ConfigureAwait(false);
+    }
 
-            if (string.IsNullOrEmpty(email))
-                return null;
+    public static async Task<ApplicationUser?> FindUserByClaimsPrincipleWithBorrowRecords(
+        this UserManager<ApplicationUser> userManager, ClaimsPrincipal user)
+    {
+        ArgumentNullException.ThrowIfNull(userManager);
+        ArgumentNullException.ThrowIfNull(user);
 
-            return await userManager.Users
-                .Include(u => u.BorrowRecords)
-                .ThenInclude(br => br.Book)
-                .SingleOrDefaultAsync(x => x.Email == email);
-        }
+        string? email = user.FindFirstValue(ClaimTypes.Email);
+
+        if (string.IsNullOrEmpty(email))
+            return null;
+
+        return await userManager.Users
+            .Include(u => u.BorrowRecords)
+            .ThenInclude(br => br.Book)
+            .SingleOrDefaultAsync(x => x.Email == email)
+            .ConfigureAwait(false);
     }
 }

@@ -36,6 +36,15 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // Authentication
+string? jwtSecret = builder.Configuration["JwtSettings:Secret"];
+if (string.IsNullOrEmpty(jwtSecret))
+{
+    throw new InvalidOperationException("JWT Secret is not configured");
+}
+
+static byte[] GetSigningKey(string secret) => Encoding.UTF8.GetBytes(secret);
+byte[] signingKey = GetSigningKey(jwtSecret);
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -46,7 +55,7 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Secret"])),
+        IssuerSigningKey = new SymmetricSecurityKey(signingKey),
         ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
         ValidAudience = builder.Configuration["JwtSettings:Audience"],
         ValidateIssuer = true,
@@ -61,7 +70,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Library Management API", Version = "v1" });
 
-    var securitySchema = new OpenApiSecurityScheme
+    OpenApiSecurityScheme securitySchema = new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
         Name = "Authorization",
@@ -77,9 +86,10 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", securitySchema);
 
-    var securityRequirement = new OpenApiSecurityRequirement
+    static string[] GetBearerScopes() => ["Bearer"];
+    OpenApiSecurityRequirement securityRequirement = new OpenApiSecurityRequirement
     {
-        { securitySchema, new[] { "Bearer" } }
+        { securitySchema, GetBearerScopes() }
     };
 
     c.AddSecurityRequirement(securityRequirement);
@@ -123,24 +133,13 @@ app.MapControllers();
 // Run database initialization
 await InitializeDatabase(app).ConfigureAwait(false);
 
-app.Run();
+await app.RunAsync().ConfigureAwait(false);
 
 async Task InitializeDatabase(WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
+    using IServiceScope scope = app.Services.CreateScope();
+    IServiceProvider services = scope.ServiceProvider;
 
-    try
-    {
-        var dbInitializer = services.GetRequiredService<DatabaseInitializer>();
-        await dbInitializer.InitializeAsync();
-
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Database initialization and seeding completed successfully.");
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing and seeding the database");
-    }
+    DatabaseInitializer dbInitializer = services.GetRequiredService<DatabaseInitializer>();
+    await dbInitializer.InitializeAsync().ConfigureAwait(false);
 }

@@ -11,7 +11,7 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<IEnumerable<BorrowRecord>> GetActiveBorrowsByUserAsync(string userId)
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
             .Where(br => br.UserId == userId && !br.IsReturned)
@@ -20,7 +20,7 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<IEnumerable<BorrowRecord>> GetOverdueBorrowsAsync()
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
             .Where(br => !br.IsReturned && br.DueDate < DateTime.UtcNow)
@@ -29,7 +29,7 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<BorrowRecord?> GetActiveBorrowByBookAndUserAsync(int bookId, string userId)
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
             .FirstOrDefaultAsync(br => br.BookId == bookId && br.UserId == userId && !br.IsReturned).ConfigureAwait(false);
@@ -37,7 +37,7 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByUserAsync(string userId)
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
             .Where(br => br.UserId == userId)
@@ -47,7 +47,7 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<IEnumerable<BorrowRecord>> GetBorrowHistoryByBookAsync(int bookId)
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
             .Where(br => br.BookId == bookId)
@@ -57,9 +57,9 @@ public class BorrowRecordRepository : GenericRepository<BorrowRecord>, IBorrowRe
 
     public async Task<BorrowRecord?> GetBorrowRecordWithDetailsAsync(int borrowRecordId)
     {
-        return await _dbSet
+        return await Context.Set<BorrowRecord>()
             .Include(br => br.Book)
             .Include(br => br.User)
-            .FirstOrDefaultAsync(br => br.Id == borrowRecordId);
+            .FirstOrDefaultAsync(br => br.Id == borrowRecordId).ConfigureAwait(false);
     }
 }

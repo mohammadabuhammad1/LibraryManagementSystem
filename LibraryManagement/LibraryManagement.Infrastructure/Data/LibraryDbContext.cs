@@ -111,6 +111,7 @@ public class LibraryDbContext : IdentityDbContext<ApplicationUser, IdentityRole,
                 .HasForeignKey(br => br.BookId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Explicitly configure the foreign key to use UserId
             entity.HasOne(br => br.User)
                 .WithMany(u => u.BorrowRecords)
                 .HasForeignKey(br => br.UserId)

@@ -5,175 +5,167 @@ using LibraryManagement.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace LibraryManagement.API.Controllers
+namespace LibraryManagement.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+internal sealed class BorrowRecordsController(IBorrowRecordService borrowRecordService) : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
-    public class BorrowRecordsController : ControllerBase
+    [HttpPost("BorrowBook")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian,Member")]
+    public async Task<ActionResult<BorrowRecordDto>> BorrowBook([FromBody] CreateBorrowRecordDto borrowDto)
     {
-        private readonly IBorrowRecordService _borrowRecordService;
+        BorrowRecordDto borrowRecord = await borrowRecordService
+            .BorrowBookAsync(borrowDto)
+            .ConfigureAwait(false);
 
-        public BorrowRecordsController(IBorrowRecordService borrowRecordService)
+        return Ok(borrowRecord);
+    }
+
+    [HttpPost("ReturnBook")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian")]
+    public async Task<ActionResult<BorrowRecordDto>> ReturnBook([FromBody] ReturnBookDto returnDto)
+    {
+        BorrowRecordDto borrowRecord = await borrowRecordService
+            .ReturnBookAsync(returnDto)
+            .ConfigureAwait(false);
+
+        return Ok(borrowRecord);
+    }
+
+    [HttpGet("MemberBorrowHistory/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Roles = "Admin,Librarian,Member")]
+    public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetUserBorrowHistory(string userId)
+    {
+        if (User.IsInRole("Member") && User.Identity?.Name != userId)
         {
-            _borrowRecordService = borrowRecordService;
+            return Forbid();
         }
 
+        IEnumerable<BorrowRecordDto> history = await borrowRecordService
+            .GetUserBorrowHistoryAsync(userId)
+            .ConfigureAwait(false);
 
-        [HttpPost("BorrowBook")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian,Member")]
-        public async Task<ActionResult<BorrowRecordDto>> BorrowBook([FromBody] CreateBorrowRecordDto borrowDto)
+        return Ok(history);
+    }
+
+    [HttpGet("ActiveBorrows/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Roles = "Admin,Librarian,Member")]
+    public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetActiveBorrowsByMember(string userId)
+    {
+        if (User.IsInRole("Member") && User.Identity?.Name != userId)
         {
-            try
-            {
-                var borrowRecord = await _borrowRecordService.BorrowBookAsync(borrowDto);
-                return Ok(borrowRecord);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
+            return Forbid();
         }
 
-        [HttpPost("ReturnBook")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian")]
-        public async Task<ActionResult<BorrowRecordDto>> ReturnBook([FromBody] ReturnBookDto returnDto)
-        {
-            try
-            {
-                var borrowRecord = await _borrowRecordService.ReturnBookAsync(returnDto);
-                return Ok(borrowRecord);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
+        IEnumerable<BorrowRecordDto> activeBorrows = await borrowRecordService
+            .GetActiveBorrowsByUserAsync(userId)
+            .ConfigureAwait(false);
 
-        [HttpGet("MemberBorrowHistory/{userId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [Authorize(Roles = "Admin,Librarian,Member")]
-        public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetUserBorrowHistory(string userId)
+        return Ok(activeBorrows);
+    }
+
+    [HttpGet("OverdueBooks")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Roles = "Admin,Librarian")]
+    public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetOverdueBooks()
+    {
+        IEnumerable<BorrowRecordDto> overdueBooks = await borrowRecordService
+            .GetOverdueBooksAsync()
+            .ConfigureAwait(false);
+
+        return Ok(overdueBooks);
+    }
+
+    [HttpGet("CalculateFine/{borrowRecordId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian,Member")]
+    public async Task<ActionResult<decimal>> CalculateFine(int borrowRecordId)
+    {
+        if (User.IsInRole("Member"))
         {
-            if (User.IsInRole("Member") && User.Identity.Name != userId)
+            string? userName = User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName))
+            {
+                return Unauthorized(new ApiResponse(401));
+            }
+
+            bool canViewFine = await borrowRecordService
+                .CanUserViewFineAsync(borrowRecordId, userName)
+                .ConfigureAwait(false);
+
+            if (!canViewFine)
             {
                 return Forbid();
             }
-
-            var history = await _borrowRecordService.GetUserBorrowHistoryAsync(userId);
-            return Ok(history);
         }
 
-        [HttpGet("ActiveBorrows/{userId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [Authorize(Roles = "Admin,Librarian,Member")]
-        public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetActiveBorrowsByMember(string userId)
+        decimal fine = await borrowRecordService
+            .CalculateFineAsync(borrowRecordId)
+            .ConfigureAwait(false);
+
+        return Ok(fine);
+    }
+
+    [HttpGet("BookBorrowHistory/{bookId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian")]
+    public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetBookBorrowHistory(int bookId)
+    {
+        IEnumerable<BorrowRecordDto> history = await borrowRecordService
+            .GetBorrowHistoryByBookAsync(bookId)
+            .ConfigureAwait(false);
+
+        return Ok(history);
+    }
+
+    [HttpPost("RenewBorrow/{borrowRecordId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian,Member")]
+    public async Task<ActionResult<BorrowRecordDto>> RenewBorrow(int borrowRecordId, [FromBody] int additionalDays)
+    {
+        string? userName = User.Identity?.Name;
+
+        if (string.IsNullOrEmpty(userName))
         {
-            if (User.IsInRole("Member") && User.Identity.Name != userId)
-            {
-                return Forbid();
-            }
-
-            var activeBorrows = await _borrowRecordService.GetActiveBorrowsByUserAsync(userId);
-            return Ok(activeBorrows);
+            return Unauthorized(new ApiResponse(401));
         }
 
-        [HttpGet("OverdueBooks")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [Authorize(Roles = "Admin,Librarian")]
-        public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetOverdueBooks()
+        BorrowRecordDto renewedRecord = await borrowRecordService
+            .RenewBorrowAsync(borrowRecordId, additionalDays, userName)
+            .ConfigureAwait(false);
+
+        return Ok(renewedRecord);
+    }
+
+    [HttpGet("BorrowStats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Roles = "Admin,Librarian")]
+    public async Task<ActionResult<BorrowStatsDto>> GetBorrowStats()
+    {
+        IEnumerable<BorrowRecordDto> overdueBooks = await borrowRecordService
+            .GetOverdueBooksAsync()
+            .ConfigureAwait(false);
+
+
+
+        BorrowStatsDto stats = new BorrowStatsDto
         {
-            var overdueBooks = await _borrowRecordService.GetOverdueBooksAsync();
-            return Ok(overdueBooks);
-        }
+            TotalOverdue = overdueBooks.Count(),
+            TotalFines = overdueBooks.Sum(b => b.FineAmount ?? 0),
+            MostBorrowedBooks = "You could add this logic to service",
+        };
 
-
-        [HttpGet("CalculateFine/{borrowRecordId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian,Member")]
-        public async Task<ActionResult<decimal>> CalculateFine(int borrowRecordId)
-        {
-            try
-            {
-                if (User.IsInRole("Member"))
-                {
-                    var canViewFine = await _borrowRecordService.CanUserViewFineAsync(borrowRecordId, User.Identity.Name);
-                    if (!canViewFine)
-                    {
-                        return Forbid();
-                    }
-                }
-
-                var fine = await _borrowRecordService.CalculateFineAsync(borrowRecordId);
-                return Ok(fine);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
-
-
-        [HttpGet("BookBorrowHistory/{bookId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian")]
-        public async Task<ActionResult<IEnumerable<BorrowRecordDto>>> GetBookBorrowHistory(int bookId)
-        {
-            try
-            {
-                var history = await _borrowRecordService.GetBorrowHistoryByBookAsync(bookId);
-                return Ok(history);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
-
-        [HttpPost("RenewBorrow/{borrowRecordId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian,Member")]
-        public async Task<ActionResult<BorrowRecordDto>> RenewBorrow(int borrowRecordId, [FromBody] int additionalDays)
-        {
-            try
-            {
-                var userId = User.Identity.Name;
-                var renewedRecord = await _borrowRecordService.RenewBorrowAsync(borrowRecordId, additionalDays, userId);
-                return Ok(renewedRecord);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
-
-        [HttpGet("BorrowStats")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [Authorize(Roles = "Admin,Librarian")]
-        public async Task<ActionResult<object>> GetBorrowStats()
-        {
-            try
-            {
-                var overdueBooks = await _borrowRecordService.GetOverdueBooksAsync();
-                var stats = new
-                {
-                    TotalOverdue = overdueBooks.Count(),
-                    TotalFines = overdueBooks.Sum(b => b.FineAmount ?? 0),
-                    MostBorrowedBooks = "You could add this logic to service"
-                };
-                return Ok(stats);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
+        return Ok(stats);
     }
 }

@@ -7,42 +7,47 @@ namespace LibraryManagement.Infrastructure.Repositories;
 
 public class GenericRepository<T>(LibraryDbContext context) : IGenericRepository<T> where T : BaseEntity
 {
-    protected readonly LibraryDbContext _context = context;
-    protected readonly DbSet<T> _dbSet = context.Set<T>();
+    protected LibraryDbContext Context { get; } = context;// review
 
     public async Task<T?> GetByIdAsync(int id)
     {
-        return await _dbSet.FindAsync(id).ConfigureAwait(false);
+        return await Context.Set<T>().FindAsync(id).ConfigureAwait(false);
     }
 
     public async Task<IEnumerable<T>> GetAllAsync()
     {
-        return await _dbSet.ToListAsync().ConfigureAwait(false);
+        return await Context.Set<T>().ToListAsync().ConfigureAwait(false);
     }
 
     public async Task<T> AddAsync(T entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         entity.CreatedAt = DateTime.UtcNow;
-        await _dbSet.AddAsync(entity).ConfigureAwait(false);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        await Context.Set<T>().AddAsync(entity).ConfigureAwait(false);
+        await Context.SaveChangesAsync().ConfigureAwait(false);
         return entity;
     }
 
     public async Task UpdateAsync(T entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         entity.UpdatedAt = DateTime.UtcNow;
-        _dbSet.Update(entity);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        Context.Set<T>().Update(entity);
+        await Context.SaveChangesAsync().ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(T entity)
     {
-        _dbSet.Remove(entity);
-        await _context.SaveChangesAsync().ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        Context.Set<T>().Remove(entity);
+        await Context.SaveChangesAsync().ConfigureAwait(false);
     }
 
     public async Task<bool> ExistsAsync(int id)
     {
-        return await _dbSet.AnyAsync(e => e.Id == id).ConfigureAwait(false);
+        return await Context.Set<T>().AnyAsync(e => e.Id == id).ConfigureAwait(false);
     }
 }
