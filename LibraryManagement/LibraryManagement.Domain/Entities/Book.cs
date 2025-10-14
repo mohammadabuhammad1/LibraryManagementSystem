@@ -1,4 +1,6 @@
-﻿namespace LibraryManagement.Domain.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace LibraryManagement.Domain.Entities
 {
     public class Book : BaseEntity
     {
@@ -13,6 +15,8 @@
 
         public int? LibraryId { get; set; }
         public virtual Library? Library { get; set; }
+        
+        // Make sure this navigation property exists
         public virtual ICollection<BorrowRecord> BorrowRecords { get; set; } = new List<BorrowRecord>();
     }
 }

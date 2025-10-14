@@ -1,4 +1,5 @@
-﻿using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Book;
+using LibraryManagement.Application.Dtos.Books;
 
 namespace LibraryManagement.Application.Interfaces
 {
@@ -14,6 +15,10 @@ namespace LibraryManagement.Application.Interfaces
 
         Task<IEnumerable<BorrowRecordDto>> GetBorrowHistoryByBookAsync(int bookId);
         Task<BorrowRecordDto> RenewBorrowAsync(int borrowRecordId, int additionalDays, string userId);
+
+        Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId);
+        Task<bool> CanUserBorrowAsync(string userId);
+        Task<BorrowRecordDto?> GetActiveBorrowByBookAsync(int bookId);
 
     }
 }

@@ -1,4 +1,5 @@
-﻿using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Book;
+using LibraryManagement.Application.Dtos.Books;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
@@ -14,6 +15,8 @@ namespace LibraryManagement.Application.Services
         private const decimal FINE_PER_DAY = 0.50m;
         private const int MAX_RENEWAL_DAYS = 30;
         private const int MAX_RENEWAL_COUNT = 3;
+        private const int MAX_BORROW_LIMIT = 5;
+
         public BorrowRecordService(
             IBorrowRecordRepository borrowRecordRepository,
             IBookRepository bookRepository,
@@ -239,6 +242,72 @@ namespace LibraryManagement.Application.Services
                 FineAmount = record.FineAmount,
                 Notes = record.Notes
             };
+        }
+
+        public async Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId)
+        {
+            var activeBorrows = await _borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
+
+            var borrowedBooks = new List<BookDto>();
+            foreach (var borrowRecord in activeBorrows)
+            {
+                if (borrowRecord.Book != null)
+                {
+                    borrowedBooks.Add(new BookDto
+                    {
+                        Id = borrowRecord.Book.Id,
+                        Title = borrowRecord.Book.Title,
+                        Author = borrowRecord.Book.Author,
+                        ISBN = borrowRecord.Book.ISBN,
+                        PublishedYear = borrowRecord.Book.PublishedYear,
+                        TotalCopies = borrowRecord.Book.TotalCopies,
+                        CopiesAvailable = borrowRecord.Book.CopiesAvailable
+                    });
+                }
+            }
+
+            return borrowedBooks;
+        }
+
+        public async Task<bool> CanUserBorrowAsync(string userId)
+        {
+            // Check if user exists and is active
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null || !user.IsActive)
+                return false;
+
+            // Check if user has overdue books
+            var overdueBooks = await _borrowRecordRepository.GetOverdueBorrowsAsync();
+            var userOverdueBooks = overdueBooks.Where(b => b.UserId == userId);
+            if (userOverdueBooks.Any())
+                return false;
+
+            // Check if user has reached borrowing limit
+            var activeBorrows = await _borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
+            if (activeBorrows.Count() >= MAX_BORROW_LIMIT)
+                return false;
+
+            return true;
+        }
+
+        public async Task<BorrowRecordDto?> GetActiveBorrowByBookAsync(int bookId)
+        {
+            // Get all active borrows and find the one for this book
+            var allActiveBorrows = await _borrowRecordRepository.GetAllAsync();
+            var activeBorrow = allActiveBorrows
+                .FirstOrDefault(br => br.BookId == bookId && !br.IsReturned);
+
+            if (activeBorrow == null)
+                return null;
+
+            // Load related data
+            activeBorrow.Book = await _bookRepository.GetByIdAsync(bookId);
+            if (activeBorrow.UserId != null)
+            {
+                activeBorrow.User = await _userManager.FindByIdAsync(activeBorrow.UserId);
+            }
+
+            return MapToBorrowRecordDto(activeBorrow);
         }
     }
 }

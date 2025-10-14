@@ -1,4 +1,4 @@
-﻿using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Book;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;

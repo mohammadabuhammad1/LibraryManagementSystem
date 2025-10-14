@@ -1,4 +1,4 @@
-﻿using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Book;
 
 namespace LibraryManagement.Application.Interfaces
 {
@@ -14,5 +14,7 @@ namespace LibraryManagement.Application.Interfaces
         Task<IEnumerable<BookDto>> GetAvailableBooksAsync();
         Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId);
         Task<bool> BookExistsAsync(int id);
+        Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId);
+
     }
 }

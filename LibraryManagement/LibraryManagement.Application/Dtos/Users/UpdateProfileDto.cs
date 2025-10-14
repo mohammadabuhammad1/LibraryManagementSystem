@@ -1,4 +1,4 @@
-﻿namespace API.Dtos
+﻿namespace LibraryManagement.Application.Dtos.Users
 {
     public class UpdateProfileDto
     {

@@ -1,5 +1,6 @@
 ﻿using LibraryManagement.API.Errors;
-using LibraryManagement.Application.Dtos;
+using LibraryManagement.Application.Dtos.Book;
+using LibraryManagement.Application.Dtos.Books;
 using LibraryManagement.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

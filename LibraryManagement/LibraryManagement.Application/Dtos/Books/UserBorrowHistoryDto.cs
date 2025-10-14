@@ -1,6 +1,4 @@
-﻿
-
-using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Books;
 
 public class UserBorrowHistoryDto
 {

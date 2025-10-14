@@ -1,4 +1,4 @@
-﻿using LibraryManagement.Application.Dtos;
+﻿using LibraryManagement.Application.Dtos.Book;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
@@ -89,6 +89,13 @@ namespace LibraryManagement.Application.Services
         {
             return await _bookRepository.ExistsAsync(id);
         }
+
+        public async Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId)
+        {
+            var books = await _bookRepository.GetBorrowedBooksByUserAsync(userId);
+            return books.Select(MapToBookDto);
+        }
+
 
         private static BookDto MapToBookDto(Book book)
         {

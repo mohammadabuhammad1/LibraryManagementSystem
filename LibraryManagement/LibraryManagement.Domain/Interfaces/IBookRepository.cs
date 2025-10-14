@@ -15,5 +15,7 @@ namespace LibraryManagement.Domain.Interfaces
         Task<Book?> GetByIsbnAsync(string isbn);
         Task<IEnumerable<Book>> GetAvailableBooksAsync();
         Task<IEnumerable<Book>> GetBooksByLibraryAsync(int libraryId);
+        Task<IEnumerable<Book>> GetBorrowedBooksByUserAsync(string userId);
+
     }
 }

@@ -3,6 +3,8 @@ using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Application.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using LibraryManagement.Domain.Entities;
 
 namespace LibraryManagement.API.Controllers
 {
@@ -13,9 +15,11 @@ namespace LibraryManagement.API.Controllers
     {
         private readonly IRoleService _roleService;
 
-        public RolesController(IRoleService roleService)
+        public RolesController(
+            IRoleService roleService,
+            UserManager<ApplicationUser> userManager) : base(userManager) 
         {
-            _roleService = roleService;
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
 
         [HttpGet]
@@ -132,7 +136,7 @@ namespace LibraryManagement.API.Controllers
         }
 
         [HttpDelete("{roleName}")]
-        [Authorize(Roles = UserRoles.SuperAdmin)] 
+        [Authorize(Roles = UserRoles.SuperAdmin)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

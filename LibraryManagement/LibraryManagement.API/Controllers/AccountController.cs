@@ -1,6 +1,6 @@
-﻿using API.Dtos;
-using LibraryManagement.API.Extensions;
+﻿using LibraryManagement.API.Extensions;
 using LibraryManagement.Application.Dtos;
+using LibraryManagement.Application.Dtos.Users;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Infrastructure.Constants;
@@ -25,7 +25,7 @@ namespace LibraryManagement.API.Controllers
             SignInManager<ApplicationUser> signInManager,
             ITokenService tokenService,
             IBorrowRecordService borrowRecordService,
-            IRoleService roleService)
+            IRoleService roleService) : base(userManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -35,6 +35,7 @@ namespace LibraryManagement.API.Controllers
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
         {
             var user = await _userManager.FindByEmailAsync(loginDto.Email);
@@ -53,6 +54,15 @@ namespace LibraryManagement.API.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             var token = await _tokenService.CreateToken(user);
 
+            // Set token in cookie for web applications (optional)
+            Response.Cookies.Append("access_token", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true, // Use true in production (HTTPS)
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
             var activeBorrows = await _borrowRecordService.GetActiveBorrowsByUserAsync(user.Id);
             var borrowHistory = await _borrowRecordService.GetUserBorrowHistoryAsync(user.Id);
             var overdueBooks = await _borrowRecordService.GetOverdueBooksAsync();
@@ -64,7 +74,7 @@ namespace LibraryManagement.API.Controllers
                 Email = user.Email,
                 Name = user.Name,
                 Phone = user.Phone,
-                Token = token,
+                Token = token, 
                 MembershipDate = user.MembershipDate,
                 IsActive = user.IsActive,
                 Roles = roles.ToList(),
@@ -129,6 +139,18 @@ namespace LibraryManagement.API.Controllers
                 TotalFines = 0
             };
         }
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<ActionResult> Logout()
+        {
+            // Clear the token cookie
+            Response.Cookies.Delete("access_token");
+
+            // Sign out if using cookie authentication
+            await _signInManager.SignOutAsync();
+
+            return Ok(new { message = "Logged out successfully" });
+        }
 
         [HttpGet("emailexists")]
         public async Task<ActionResult<bool>> CheckEmailExistsAsync([FromQuery] string email)
@@ -137,13 +159,14 @@ namespace LibraryManagement.API.Controllers
         }
 
         [Authorize]
-        [HttpGet]
+        [HttpGet("me")]
         public async Task<ActionResult<UserDto>> GetCurrentUser()
         {
-            var user = await _userManager.FindByEmailFromClaimsPrincipal(User);
+            // Use the base class method to get current user
+            var user = await GetCurrentUserAsync();
 
             if (user == null)
-                return NotFound("User not found");
+                return Unauthorized("User not found");
 
             // Get user roles
             var roles = await _userManager.GetRolesAsync(user);
@@ -160,7 +183,7 @@ namespace LibraryManagement.API.Controllers
                 Email = user.Email,
                 Name = user.Name,
                 Phone = user.Phone,
-                Token = await _tokenService.CreateToken(user),
+                Token = await _tokenService.CreateToken(user), // Refresh token
                 MembershipDate = user.MembershipDate,
                 IsActive = user.IsActive,
                 Roles = roles.ToList(),
@@ -171,16 +194,16 @@ namespace LibraryManagement.API.Controllers
             };
         }
 
+        //duplicated
         [Authorize]
         [HttpGet("profile")]
         public async Task<ActionResult<UserDto>> GetUserProfile()
         {
-            var user = await _userManager.FindByEmailFromClaimsPrincipal(User);
+            var user = await GetCurrentUserAsync();
 
             if (user == null)
                 return NotFound("User not found");
 
-            // Get user roles
             var roles = await _userManager.GetRolesAsync(user);
 
             return new UserDto
@@ -200,7 +223,7 @@ namespace LibraryManagement.API.Controllers
         [HttpPut("profile")]
         public async Task<ActionResult<UserDto>> UpdateUserProfile(UpdateProfileDto updateDto)
         {
-            var user = await _userManager.FindByEmailFromClaimsPrincipal(User);
+            var user = await GetCurrentUserAsync(); // Use base method
 
             if (user == null)
                 return NotFound("User not found");
@@ -233,7 +256,7 @@ namespace LibraryManagement.API.Controllers
         [HttpPost("change-password")]
         public async Task<ActionResult> ChangePassword(ChangePasswordDto changePasswordDto)
         {
-            var user = await _userManager.FindByEmailFromClaimsPrincipal(User);
+            var user = await GetCurrentUserAsync(); 
 
             if (user == null)
                 return NotFound("User not found");
@@ -257,7 +280,6 @@ namespace LibraryManagement.API.Controllers
 
             return Ok(new { message = "Password changed successfully" });
         }
-
         [Authorize(Roles = $"{UserRoles.Librarian},{UserRoles.Admin},{UserRoles.SuperAdmin}")]
         [HttpGet("users-with-borrows")]
         public async Task<ActionResult<List<UserWithBorrowsDto>>> GetUsersWithBorrows()

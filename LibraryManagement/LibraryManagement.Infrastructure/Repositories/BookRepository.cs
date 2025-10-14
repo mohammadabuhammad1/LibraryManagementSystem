@@ -27,5 +27,13 @@ namespace LibraryManagement.Infrastructure.Repositories
                 .Where(b => b.LibraryId == libraryId)
                 .ToListAsync();
         }
+        public async Task<IEnumerable<Book>> GetBorrowedBooksByUserAsync(string userId)
+        {
+            return await _dbSet
+                .Where(b => b.BorrowRecords.Any(br =>
+                    br.UserId == userId &&
+                    br.ReturnDate == null)) // Only active borrows
+                .ToListAsync();
+        }
     }
 }

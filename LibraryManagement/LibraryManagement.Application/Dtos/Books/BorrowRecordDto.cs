@@ -1,11 +1,10 @@
-﻿namespace LibraryManagement.Application.Dtos
+﻿namespace LibraryManagement.Application.Dtos.Books
 {
     public class BorrowRecordDto
     {
         public int Id { get; set; }
         public int BookId { get; set; }
         public string UserId { get; set; }
-        //public int MemberId { get; set; }
         public string BookTitle { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public DateTime BorrowDate { get; set; }
