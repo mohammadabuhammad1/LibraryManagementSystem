@@ -1,6 +1,5 @@
 ﻿using LibraryManagement.Infrastructure.Constants;
 using LibraryManagement.Application.Interfaces;
-using LibraryManagement.Application.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;

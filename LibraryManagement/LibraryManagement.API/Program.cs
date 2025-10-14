@@ -1,5 +1,4 @@
-﻿using LibraryManagement.API.Extensions;
-using LibraryManagement.API.Services;
+﻿using LibraryManagement.API.Services;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Application.Services;
 using LibraryManagement.Domain.Entities;

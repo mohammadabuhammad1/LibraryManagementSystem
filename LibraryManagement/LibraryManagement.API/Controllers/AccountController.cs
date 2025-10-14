@@ -1,5 +1,4 @@
 ﻿using LibraryManagement.API.Extensions;
-using LibraryManagement.Application.Dtos;
 using LibraryManagement.Application.Dtos.Users;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;

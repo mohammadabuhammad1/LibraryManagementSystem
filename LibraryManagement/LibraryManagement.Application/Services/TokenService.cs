@@ -27,7 +27,8 @@ namespace LibraryManagement.API.Services
 
         public async Task<string> CreateToken(ApplicationUser user)
         {
-            if (user == null) throw new ArgumentNullException(nameof(user));
+
+            ArgumentNullException.ThrowIfNull(user);
 
             var claims = new List<Claim>
             {
@@ -86,7 +87,7 @@ namespace LibraryManagement.API.Services
 
                 return userId;
             }
-            catch
+            catch (InvalidOperationException)
             {
                 return null;
             }

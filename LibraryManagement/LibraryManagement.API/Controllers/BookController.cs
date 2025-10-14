@@ -6,7 +6,6 @@ using LibraryManagement.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 
 namespace LibraryManagement.API.Controllers
 {
@@ -72,6 +71,9 @@ namespace LibraryManagement.API.Controllers
                     return BadRequest($"Book with ISBN {createBookDto.ISBN} already exists");
 
                 var book = await _bookService.CreateBookAsync(createBookDto);
+                if (book == null)
+                    return BadRequest("The book was not found");
+
                 return CreatedAtAction(nameof(GetBookById), new { id = book.Id }, book);
             }
             catch (Exception ex)

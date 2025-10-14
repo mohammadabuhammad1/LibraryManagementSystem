@@ -1,0 +1,36 @@
+<!--
+Benefits
+1- Centralized Version Management: Instead of managing package versions in each individual .csproj file, you define all versions in one central location. This eliminates version conflicts and ensures consistency across all projects in your solution.
+2- Simplified Project Files: Your .csproj files become cleaner because they only reference
+3- Easier Maintenance: When you need to update a package version, you only change it in one place rather than hunting through multiple project files.
+4- Prevents Version Drift: Eliminates the common problem where different projects in the same solution use different versions of the same package, which can cause runtime issues.
+5- Team Collaboration: Ensures all team members use the same package versions, reducing "works on my machine" issues.
+
+This approach is especially valuable for .NET teams managing multiple microservices or projects within a solution, as it provides better control and visibility over your dependency graph.
+-->
+
+<Project>
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.12" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0-rc.1.25451.107" />
+		<PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+		<PackageVersion Include="Swashbuckle.AspNetCore" Version="9.0.6" />
+		<PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="9.0.6" />
+		<PackageVersion Include="Swashbuckle.AspNetCore.Swagger" Version="9.0.6" />
+		<PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.6" />
+		<PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.6" />
+		<PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+		<PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.12" />
+		<PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+		<PackageVersion Include="SonarAnalyzer.CSharp" Version="10.15.0.120848"/>
+		
+	</ItemGroup>
+
+
+
+</Project>

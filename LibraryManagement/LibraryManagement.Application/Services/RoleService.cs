@@ -78,10 +78,7 @@ namespace LibraryManagement.API.Services
         public async Task<IdentityResult> DeleteRoleAsync(string roleName)
         {
             var role = await _roleManager.FindByNameAsync(roleName);
-            if (role == null)
-                throw new Exception("Role not found");
-            return await _roleManager.DeleteAsync(role);
-
+            return role == null ? throw new Exception("Role not found") : await _roleManager.DeleteAsync(role);
         }
     }
 }
