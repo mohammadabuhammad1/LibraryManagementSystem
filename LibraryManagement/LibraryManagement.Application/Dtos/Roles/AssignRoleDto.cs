@@ -1,4 +1,4 @@
-﻿
+﻿namespace LibraryManagement.Application.Dtos.Roles;
 public class AssignRoleDto
 {
     public string UserId { get; set; } = string.Empty;

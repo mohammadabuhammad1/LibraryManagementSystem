@@ -1,15 +1,14 @@
-﻿using LibraryManagement.Application.Dtos.Book;
+﻿using LibraryManagement.Application.Dtos.Books;
 
-namespace LibraryManagement.Application.Interfaces
+namespace LibraryManagement.Application.Interfaces;
+
+public interface ILibraryService
 {
-    public interface ILibraryService
-    {
 
-        Task<BookDto> BorrowBookAsync(int bookId);
-        Task<BookDto> ReturnBookAsync(int bookId);
-        Task<IEnumerable<BookDto>> GetBorrowedBooksAsync();
-        Task<IEnumerable<BookDto>> GetAvailableBooksAsync();
+    Task<BookDto> BorrowBookAsync(int bookId);
+    Task<BookDto> ReturnBookAsync(int bookId);
+    Task<IEnumerable<BookDto>> GetBorrowedBooksAsync();
+    Task<IEnumerable<BookDto>> GetAvailableBooksAsync();
 
 
-    }
 }

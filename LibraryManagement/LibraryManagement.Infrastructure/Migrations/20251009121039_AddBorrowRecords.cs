@@ -2,21 +2,20 @@
 
 #nullable disable
 
-namespace LibraryManagement.Infrastructure.Migrations
+namespace LibraryManagement.Infrastructure.Migrations;
+
+/// <inheritdoc />
+public partial class AddBorrowRecords : Migration
 {
     /// <inheritdoc />
-    public partial class AddBorrowRecords : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
 
-        }
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        // Method intentionally left empty.
     }
 }

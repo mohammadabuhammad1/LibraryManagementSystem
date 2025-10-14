@@ -12,7 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -104,7 +104,7 @@ builder.Services.AddScoped<RoleSeeder>();
 builder.Services.AddScoped<DataSeeder>();
 builder.Services.AddScoped<DatabaseInitializer>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -121,7 +121,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Run database initialization
-await InitializeDatabase(app);
+await InitializeDatabase(app).ConfigureAwait(false);
 
 app.Run();
 

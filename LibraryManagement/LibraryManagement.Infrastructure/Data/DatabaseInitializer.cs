@@ -2,48 +2,61 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace LibraryManagement.Infrastructure.Data
+namespace LibraryManagement.Infrastructure.Data;
+
+public partial class DatabaseInitializer(IServiceProvider serviceProvider, ILogger<DatabaseInitializer> logger)
 {
-    public class DatabaseInitializer
+    // LoggerMessage delegates for high-performance logging
+    private static readonly Action<ILogger, Exception?> _databaseMigrated =
+        LoggerMessage.Define(LogLevel.Information, new EventId(1, "DatabaseMigrated"),
+            "Database migrated successfully");
+
+    private static readonly Action<ILogger, Exception?> _initializationCompleted =
+        LoggerMessage.Define(LogLevel.Information, new EventId(2, "InitializationCompleted"),
+            "Database initialization completed successfully");
+
+    private static readonly Action<ILogger, string, Exception?> _initializationError =
+        LoggerMessage.Define<string>(LogLevel.Error, new EventId(3, "InitializationError"),
+            "An error occurred while initializing the database: {ErrorMessage}");
+
+    public async Task InitializeAsync()
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<DatabaseInitializer> _logger;
+        using IServiceScope scope = serviceProvider.CreateScope();  // ✓ Explicit type
+        IServiceProvider scopeServiceProvider = scope.ServiceProvider;  // ✓ Renamed to avoid hiding
 
-        public DatabaseInitializer(IServiceProvider serviceProvider, ILogger<DatabaseInitializer> logger)
+        try
         {
-            _serviceProvider = serviceProvider;
-            _logger = logger;
+            LibraryDbContext context = scopeServiceProvider.GetRequiredService<LibraryDbContext>();  // ✓ Explicit type
+
+            // Apply migrations
+            await context.Database.MigrateAsync().ConfigureAwait(false);   
+            _databaseMigrated(logger, null);
+
+            // Seed roles and super admin
+            RoleSeeder roleSeeder = scopeServiceProvider.GetRequiredService<RoleSeeder>();  // ✓ Explicit type
+            await roleSeeder.SeedRolesAsync().ConfigureAwait(false);   
+            await roleSeeder.SeedSuperAdminAsync().ConfigureAwait(false);   
+
+            // Seed initial data
+            DataSeeder dataSeeder = scopeServiceProvider.GetRequiredService<DataSeeder>();  // ✓ Explicit type
+            await dataSeeder.SeedAsync().ConfigureAwait(false);   
+
+            _initializationCompleted(logger, null);
         }
-
-        public async Task InitializeAsync()
+        catch (DbUpdateException dbEx)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var serviceProvider = scope.ServiceProvider;
-
-            try
-            {
-                var context = serviceProvider.GetRequiredService<LibraryDbContext>();
-
-                // Apply migrations
-                await context.Database.MigrateAsync();
-                _logger.LogInformation("Database migrated successfully");
-
-                // Seed roles and super admin
-                var roleSeeder = serviceProvider.GetRequiredService<RoleSeeder>();
-                await roleSeeder.SeedRolesAsync();
-                await roleSeeder.SeedSuperAdminAsync();
-
-                // Seed initial data
-                var dataSeeder = serviceProvider.GetRequiredService<DataSeeder>();
-                await dataSeeder.SeedAsync();
-
-                _logger.LogInformation("Database initialization completed successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while initializing the database.");
-                throw;
-            }
+            _initializationError(logger, $"Database update failed: {dbEx.Message}", dbEx);
+            throw new InvalidOperationException("Database initialization failed due to migration error", dbEx);
+        }
+        catch (InvalidOperationException invalidOpEx)
+        {
+            _initializationError(logger, $"Service resolution failed: {invalidOpEx.Message}", invalidOpEx);
+            throw new InvalidOperationException("Database initialization failed due to service resolution error", invalidOpEx);
+        }
+        catch (Exception ex)
+        {
+            _initializationError(logger, $"Unexpected error: {ex.Message}", ex);
+            throw new DatabaseInitializationException("Database initialization failed", ex);// ask eng moath
         }
     }
 }

@@ -19,24 +19,33 @@ public class BorrowRecordService(
 
     public async Task<BorrowRecordDto> BorrowBookAsync(CreateBorrowRecordDto borrowDto)
     {
-        var user = await userManager.FindByIdAsync(borrowDto.UserId);
+        ArgumentNullException.ThrowIfNull(borrowDto);
+
+        // ✅ Validate UserId is not null or empty
+        if (string.IsNullOrWhiteSpace(borrowDto.UserId))
+            throw new ArgumentException("User ID cannot be null or empty", nameof(borrowDto));
+
+
+        ApplicationUser? user = await userManager.FindByIdAsync(borrowDto.UserId).ConfigureAwait(false);
         if (user == null)
-            throw new Exception($"User with ID {borrowDto.UserId} not found.");
+            throw new InvalidOperationException($"User with ID {borrowDto.UserId} not found.");
 
         if (!user.IsActive)
-            throw new Exception($"User {user.Name} is not active.");
+            throw new InvalidOperationException($"User {user.Name} is not active.");
 
-        var book = await bookRepository.GetByIdAsync(borrowDto.BookId);
+        Book? book = await bookRepository.GetByIdAsync(borrowDto.BookId).ConfigureAwait(false);
+
         if (book == null)
-            throw new Exception($"Book with ID {borrowDto.BookId} not found.");
+            throw new InvalidOperationException($"Book with ID {borrowDto.BookId} not found.");
 
         if (book.CopiesAvailable <= 0)
-            throw new Exception($"No copies available for '{book.Title}'.");
+            throw new InvalidOperationException($"No copies available for '{book.Title}'.");
 
-        var existingBorrow = await borrowRecordRepository
-            .GetActiveBorrowByBookAndUserAsync(borrowDto.BookId, borrowDto.UserId);
+        BorrowRecord? existingBorrow = await borrowRecordRepository
+            .GetActiveBorrowByBookAndUserAsync(borrowDto.BookId, borrowDto.UserId).ConfigureAwait(false);
+
         if (existingBorrow != null)
-            throw new Exception($"User already has '{book.Title}' borrowed.");
+            throw new InvalidOperationException($"User already has '{book.Title}' borrowed.");
 
         var borrowRecord = new BorrowRecord
         {
@@ -49,10 +58,10 @@ public class BorrowRecordService(
             CreatedAt = DateTime.UtcNow
         };
 
-        var createdRecord = await borrowRecordRepository.AddAsync(borrowRecord);
+        BorrowRecord? createdRecord = await borrowRecordRepository.AddAsync(borrowRecord).ConfigureAwait(false);
 
         book.CopiesAvailable--;
-        await bookRepository.UpdateAsync(book);
+        await bookRepository.UpdateAsync(book).ConfigureAwait(false);
 
         createdRecord.Book = book;
         createdRecord.User = user;
@@ -62,11 +71,16 @@ public class BorrowRecordService(
 
     public async Task<BorrowRecordDto> ReturnBookAsync(ReturnBookDto returnDto)
     {
+        ArgumentNullException.ThrowIfNull(returnDto);
 
-        BorrowRecord borrowRecord = await borrowRecordRepository.GetActiveBorrowByBookAndUserAsync(returnDto.BookId, returnDto.UserId).ConfigureAwait(false);
+        if(string.IsNullOrWhiteSpace(returnDto.UserId))
+            throw new ArgumentException("User ID cannot be null or empty", returnDto.UserId);
+
+        BorrowRecord? borrowRecord = await
+            borrowRecordRepository.GetActiveBorrowByBookAndUserAsync(returnDto.BookId, returnDto.UserId).ConfigureAwait(false);
 
         if (borrowRecord == null)
-            throw new Exception($"No active borrow record found for Book {returnDto.BookId} and User {returnDto.UserId}");
+            throw new InvalidOperationException($"No active borrow record found for Book {returnDto.BookId} and User {returnDto.UserId}");
 
         borrowRecord.ReturnDate = DateTime.UtcNow;
         borrowRecord.IsReturned = true;
@@ -83,16 +97,17 @@ public class BorrowRecordService(
             borrowRecord.Notes = $"{borrowRecord.Notes} | Return notes: {returnDto.Notes}";
         }
 
-        await borrowRecordRepository.UpdateAsync(borrowRecord);
+        await borrowRecordRepository.UpdateAsync(borrowRecord).ConfigureAwait(false);
 
-        var book = await bookRepository.GetByIdAsync(returnDto.BookId);
+        Book? book = await bookRepository.GetByIdAsync(returnDto.BookId).ConfigureAwait(false);
+
         if (book != null)
         {
             book.CopiesAvailable++;
-            await bookRepository.UpdateAsync(book);
+            await bookRepository.UpdateAsync(book).ConfigureAwait(false);
         }
 
-        var user = await userManager.FindByIdAsync(returnDto.UserId);
+        ApplicationUser? user = await userManager.FindByIdAsync(returnDto.UserId).ConfigureAwait(false);
         borrowRecord.Book = book!;
         borrowRecord.User = user!;
 
@@ -101,27 +116,31 @@ public class BorrowRecordService(
 
     public async Task<IEnumerable<BorrowRecordDto>> GetUserBorrowHistoryAsync(string userId)
     {
-        var records = await borrowRecordRepository.GetBorrowHistoryByUserAsync(userId);
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
+
+        IEnumerable<BorrowRecord> records = await borrowRecordRepository.GetBorrowHistoryByUserAsync(userId).ConfigureAwait(false);
         return records.Select(MapToBorrowRecordDto);
     }
 
     public async Task<IEnumerable<BorrowRecordDto>> GetOverdueBooksAsync()
     {
-        var overdueRecords = await borrowRecordRepository.GetOverdueBorrowsAsync();
+        IEnumerable<BorrowRecord> overdueRecords = await borrowRecordRepository.GetOverdueBorrowsAsync().ConfigureAwait(false);
         return overdueRecords.Select(MapToBorrowRecordDto);
     }
 
     public async Task<IEnumerable<BorrowRecordDto>> GetActiveBorrowsByUserAsync(string userId)
     {
-        var activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
+        IEnumerable<BorrowRecord> activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId).ConfigureAwait(false);
         return activeBorrows.Select(MapToBorrowRecordDto);
     }
 
     public async Task<decimal> CalculateFineAsync(int borrowRecordId)
     {
-        var record = await borrowRecordRepository.GetByIdAsync(borrowRecordId);
+        BorrowRecord? record = await borrowRecordRepository.GetByIdAsync(borrowRecordId).ConfigureAwait(false);
         if (record == null)
-            throw new Exception($"Borrow record with ID {borrowRecordId} not found.");
+            throw new InvalidOperationException($"Borrow record with ID {borrowRecordId} not found.");
 
         if (record.IsReturned && record.FineAmount.HasValue)
         {
@@ -139,58 +158,59 @@ public class BorrowRecordService(
 
     public async Task<bool> CanUserViewFineAsync(int borrowRecordId, string userId)
     {
-        var userBorrowHistory = await borrowRecordRepository.GetBorrowHistoryByUserAsync(userId);
+        IEnumerable<BorrowRecord> userBorrowHistory = await borrowRecordRepository.GetBorrowHistoryByUserAsync(userId).ConfigureAwait(false);
         return userBorrowHistory.Any(br => br.Id == borrowRecordId);
     }
 
     public async Task<IEnumerable<BorrowRecordDto>> GetBorrowHistoryByBookAsync(int bookId)
     {
-        var book = await bookRepository.GetByIdAsync(bookId);
+        Book? book = await bookRepository.GetByIdAsync(bookId).ConfigureAwait(false);
         if (book == null)
-            throw new Exception($"Book with ID {bookId} not found.");
+            throw new InvalidOperationException($"Book with ID {bookId} not found.");
 
-        var records = await borrowRecordRepository.GetBorrowHistoryByBookAsync(bookId);
+        IEnumerable<BorrowRecord> records = await borrowRecordRepository.GetBorrowHistoryByBookAsync(bookId).ConfigureAwait(false);
         return records.Select(MapToBorrowRecordDto);
     }
 
     public async Task<BorrowRecordDto> RenewBorrowAsync(int borrowRecordId, int additionalDays, string userId)
     {
         if (additionalDays <= 0)
-            throw new Exception("Additional days must be greater than zero.");
+            throw new InvalidOperationException("Additional days must be greater than zero.");
 
         if (additionalDays > MAX_RENEWAL_DAYS)
-            throw new Exception($"Maximum renewal period is {MAX_RENEWAL_DAYS} days.");
+            throw new InvalidOperationException($"Maximum renewal period is {MAX_RENEWAL_DAYS} days.");
 
-        var borrowRecord = await borrowRecordRepository.GetBorrowRecordWithDetailsAsync(borrowRecordId);
+        BorrowRecord? borrowRecord = await borrowRecordRepository.GetBorrowRecordWithDetailsAsync(borrowRecordId).ConfigureAwait(false);
         if (borrowRecord == null)
-            throw new Exception($"Borrow record with ID {borrowRecordId} not found.");
+            throw new InvalidOperationException($"Borrow record with ID {borrowRecordId} not found.");
 
         // Authorization check
         if (borrowRecord.UserId != userId)
-            throw new Exception("You can only renew your own borrow records.");
+            throw new InvalidOperationException("You can only renew your own borrow records.");
 
         if (borrowRecord.IsReturned)
-            throw new Exception("Cannot renew a book that has already been returned.");
+            throw new InvalidOperationException("Cannot renew a book that has already been returned.");
 
         if (borrowRecord.DueDate < DateTime.UtcNow)
-            throw new Exception("Cannot renew an overdue book. Please return it and pay any fines first.");
+            throw new InvalidOperationException("Cannot renew an overdue book. Please return it and pay any fines first.");
 
         // Check if book has been requested by other users
-        var book = borrowRecord.Book;
+        Book? book = borrowRecord.Book;
         if (book == null)
-            throw new Exception("Book information not found.");
+            throw new InvalidOperationException("Book information not found.");
 
         if (book.CopiesAvailable <= 0)
-            throw new Exception("Cannot renew book as all copies are currently borrowed.");
+            throw new InvalidOperationException("Cannot renew book as all copies are currently borrowed.");
 
         // Check renewal count (you might want to add a RenewalCount property to BorrowRecord)
         // For now, we'll check if it's already been renewed multiple times
-        var renewalCount = await GetRenewalCountAsync(borrowRecordId);
+
+        decimal renewalCount = await GetRenewalCountAsync(borrowRecordId).ConfigureAwait(false);
         if (renewalCount >= MAX_RENEWAL_COUNT)
-            throw new Exception($"Maximum renewal count ({MAX_RENEWAL_COUNT}) reached for this book.");
+            throw new InvalidOperationException($"Maximum renewal count ({MAX_RENEWAL_COUNT}) reached for this book.");
 
         // Calculate new due date
-        var newDueDate = borrowRecord.DueDate.AddDays(additionalDays);
+        DateTime newDueDate = borrowRecord.DueDate.AddDays(additionalDays);
 
         // Update the borrow record
         borrowRecord.DueDate = newDueDate;
@@ -199,7 +219,7 @@ public class BorrowRecordService(
         // Add renewal note
         borrowRecord.Notes = $"{borrowRecord.Notes} | Renewed on {DateTime.UtcNow:yyyy-MM-dd}, new due date: {newDueDate:yyyy-MM-dd}";
 
-        await borrowRecordRepository.UpdateAsync(borrowRecord);
+        await borrowRecordRepository.UpdateAsync(borrowRecord).ConfigureAwait(false);
 
         return MapToBorrowRecordDto(borrowRecord);
     }
@@ -208,7 +228,7 @@ public class BorrowRecordService(
     {
         // This is a simplified implementation
         // You might want to add a proper RenewalCount property to BorrowRecord entity
-        var record = await borrowRecordRepository.GetByIdAsync(borrowRecordId);
+        BorrowRecord? record = await borrowRecordRepository.GetByIdAsync(borrowRecordId).ConfigureAwait(false);
         if (record == null) return 0;
 
         // Count renewals based on notes or create a separate renewal history table
@@ -236,44 +256,41 @@ public class BorrowRecordService(
 
     public async Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId)
     {
-        var activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
 
-        var borrowedBooks = new List<BookDto>();
-        foreach (var borrowRecord in activeBorrows)
-        {
-            if (borrowRecord.Book != null)
-            {
-                borrowedBooks.Add(new BookDto
-                {
-                    Id = borrowRecord.Book.Id,
-                    Title = borrowRecord.Book.Title,
-                    Author = borrowRecord.Book.Author,
-                    ISBN = borrowRecord.Book.ISBN,
-                    PublishedYear = borrowRecord.Book.PublishedYear,
-                    TotalCopies = borrowRecord.Book.TotalCopies,
-                    CopiesAvailable = borrowRecord.Book.CopiesAvailable
-                });
-            }
-        }
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
 
-        return borrowedBooks;
+        IEnumerable<BorrowRecord> activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId).ConfigureAwait(false);
+
+        return activeBorrows
+                   .Where(borrowRecord => borrowRecord.Book != null)
+                   .Select(borrowRecord => new BookDto
+                   {
+                       Id = borrowRecord.Book!.Id,
+                       Title = borrowRecord.Book.Title,
+                       Author = borrowRecord.Book.Author,
+                       ISBN = borrowRecord.Book.ISBN,
+                       PublishedYear = borrowRecord.Book.PublishedYear,
+                       TotalCopies = borrowRecord.Book.TotalCopies,
+                       CopiesAvailable = borrowRecord.Book.CopiesAvailable
+                   });
     }
 
     public async Task<bool> CanUserBorrowAsync(string userId)
     {
         // Check if user exists and is active
-        var user = await userManager.FindByIdAsync(userId);
+        ApplicationUser? user = await userManager.FindByIdAsync(userId).ConfigureAwait(false);
         if (user == null || !user.IsActive)
             return false;
 
         // Check if user has overdue books
-        var overdueBooks = await borrowRecordRepository.GetOverdueBorrowsAsync();
-        var userOverdueBooks = overdueBooks.Where(b => b.UserId == userId);
+        IEnumerable<BorrowRecord> overdueBooks = await borrowRecordRepository.GetOverdueBorrowsAsync().ConfigureAwait(false);
+        IEnumerable<BorrowRecord> userOverdueBooks = overdueBooks.Where(b => b.UserId == userId);
         if (userOverdueBooks.Any())
             return false;
 
         // Check if user has reached borrowing limit
-        var activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId);
+        IEnumerable<BorrowRecord> activeBorrows = await borrowRecordRepository.GetActiveBorrowsByUserAsync(userId).ConfigureAwait(false);
         if (activeBorrows.Count() >= MAX_BORROW_LIMIT)
             return false;
 
@@ -283,18 +300,18 @@ public class BorrowRecordService(
     public async Task<BorrowRecordDto?> GetActiveBorrowByBookAsync(int bookId)
     {
         // Get all active borrows and find the one for this book
-        var allActiveBorrows = await borrowRecordRepository.GetAllAsync();
-        var activeBorrow = allActiveBorrows
+        IEnumerable<BorrowRecord> allActiveBorrows = await borrowRecordRepository.GetAllAsync().ConfigureAwait(false);
+        BorrowRecord? activeBorrow = allActiveBorrows
             .FirstOrDefault(br => br.BookId == bookId && !br.IsReturned);
 
         if (activeBorrow == null)
             return null;
 
         // Load related data
-        activeBorrow.Book = await bookRepository.GetByIdAsync(bookId);
+        activeBorrow.Book = await bookRepository.GetByIdAsync(bookId).ConfigureAwait(false);
         if (activeBorrow.UserId != null)
         {
-            activeBorrow.User = await userManager.FindByIdAsync(activeBorrow.UserId);
+            activeBorrow.User = await userManager.FindByIdAsync(activeBorrow.UserId).ConfigureAwait(false);
         }
 
         return MapToBorrowRecordDto(activeBorrow);

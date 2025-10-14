@@ -3,74 +3,75 @@ using LibraryManagement.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 
-namespace LibraryManagement.Infrastructure.Data
+namespace LibraryManagement.Infrastructure.Data;
+
+public partial class RoleSeeder(
+    RoleManager<IdentityRole> roleManager,
+    UserManager<ApplicationUser> userManager,
+    ILogger<RoleSeeder> logger)
 {
-    public class RoleSeeder
+    // LoggerMessage delegates for high-performance logging
+    private static readonly Action<ILogger, string, Exception?> _roleCreated =
+        LoggerMessage.Define<string>(LogLevel.Information, new EventId(1, "RoleCreated"),
+            "Created {RoleName} role");
+
+    private static readonly Action<ILogger, Exception?> _superAdminCreated =
+        LoggerMessage.Define(LogLevel.Information, new EventId(2, "SuperAdminCreated"),
+            "Super Admin user created");
+
+    private static readonly Action<ILogger, string, Exception?> _superAdminCreationFailed =
+        LoggerMessage.Define<string>(LogLevel.Error, new EventId(3, "SuperAdminCreationFailed"),
+            "Failed to create Super Admin user: {Errors}");
+
+    public async Task SeedRolesAsync()
     {
-        private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly ILogger<RoleSeeder> _logger;
+        string[] roleNames = {
+            UserRoles.SuperAdmin,
+            UserRoles.Admin,
+            UserRoles.Librarian,
+            UserRoles.Member
+        };
 
-        public RoleSeeder(
-            RoleManager<IdentityRole> roleManager,
-            UserManager<ApplicationUser> userManager,
-            ILogger<RoleSeeder> logger)
+        foreach (string roleName in roleNames)  
         {
-            _roleManager = roleManager;
-            _userManager = userManager;
-            _logger = logger;
-        }
-
-        public async Task SeedRolesAsync()
-        {
-            string[] roleNames = {
-                UserRoles.SuperAdmin,
-                UserRoles.Admin,
-                UserRoles.Librarian,
-                UserRoles.Member
-            };
-
-            foreach (var roleName in roleNames)
+            bool roleExist = await roleManager.RoleExistsAsync(roleName).ConfigureAwait(false); 
+            if (!roleExist)
             {
-                var roleExist = await _roleManager.RoleExistsAsync(roleName);
-                if (!roleExist)
-                {
-                    await _roleManager.CreateAsync(new IdentityRole(roleName));
-                    _logger.LogInformation("Created {RoleName} role", roleName);
-                }
+                await roleManager.CreateAsync(new IdentityRole(roleName)).ConfigureAwait(false);
+                _roleCreated(logger, roleName, null);
             }
         }
+    }
 
-        public async Task SeedSuperAdminAsync()
+    public async Task SeedSuperAdminAsync()
+    {
+        string superAdminEmail = "superadmin@library.com";
+        ApplicationUser? superAdminUser = await userManager.FindByEmailAsync(superAdminEmail).ConfigureAwait(false);  
+
+        if (superAdminUser == null)
         {
-            var superAdminEmail = "superadmin@library.com";
-            var superAdminUser = await _userManager.FindByEmailAsync(superAdminEmail);
-
-            if (superAdminUser == null)
+            ApplicationUser user = new() 
             {
-                var user = new ApplicationUser
-                {
-                    Name = "Super Admin",
-                    Email = superAdminEmail,
-                    UserName = superAdminEmail,
-                    Phone = "0000000000",
-                    MembershipDate = DateTime.UtcNow,
-                    IsActive = true
-                };
+                Name = "Super Admin",
+                Email = superAdminEmail,
+                UserName = superAdminEmail,
+                Phone = "0000000000",
+                MembershipDate = DateTime.UtcNow,
+                IsActive = true
+            };
 
-                var result = await _userManager.CreateAsync(user, "SuperAdmin123!");
+            IdentityResult result = await userManager.CreateAsync(user, "SuperAdmin123!").ConfigureAwait(false);  
 
-                if (result.Succeeded)
-                {
-                    await _userManager.AddToRoleAsync(user, UserRoles.SuperAdmin);
-                    await _userManager.AddToRoleAsync(user, UserRoles.Admin);
-                    _logger.LogInformation("Super Admin user created");
-                }
-                else
-                {
-                    _logger.LogError("Failed to create Super Admin user: {Errors}",
-                        string.Join(", ", result.Errors.Select(e => e.Description)));
-                }
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(user, UserRoles.SuperAdmin).ConfigureAwait(false);
+                await userManager.AddToRoleAsync(user, UserRoles.Admin).ConfigureAwait(false);
+                _superAdminCreated(logger, null);
+            }
+            else
+            {
+                string errors = string.Join(", ", result.Errors.Select(e => e.Description)); 
+                _superAdminCreationFailed(logger, errors, null);
             }
         }
     }

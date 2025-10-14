@@ -1,4 +1,6 @@
-﻿
+﻿using System.Collections.ObjectModel;
+
+namespace LibraryManagement.Application.Dtos.Users;
 
 public class UserWithBorrowsDto
 {
@@ -7,7 +9,7 @@ public class UserWithBorrowsDto
     public string Email { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public bool IsActive { get; set; }
-    public List<string> Roles { get; set; } = new List<string>();
+    public Collection<string> Roles { get; } = [];
     public int ActiveBorrowsCount { get; set; }
     public int TotalBorrowsCount { get; set; }
     public int OverdueBooksCount { get; set; }

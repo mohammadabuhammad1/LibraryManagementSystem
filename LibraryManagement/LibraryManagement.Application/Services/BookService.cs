@@ -1,4 +1,4 @@
-﻿using LibraryManagement.Application.Dtos.Book;
+﻿using LibraryManagement.Application.Dtos.Books;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
@@ -9,13 +9,13 @@ public class BookService(IBookRepository bookRepository) : IBookService
 {
     public async Task<BookDto?> GetBookByIdAsync(int id)
     {
-        var book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
+        Book? book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
         return book == null ? null : MapToBookDto(book);
     }
 
     public async Task<IEnumerable<BookDto>> GetAllBooksAsync()
     {
-        var books = await bookRepository.GetAllAsync().ConfigureAwait(false);
+        IEnumerable<Book> books = await bookRepository.GetAllAsync().ConfigureAwait(false);
         return books.Select(MapToBookDto);
     }
 
@@ -36,7 +36,7 @@ public class BookService(IBookRepository bookRepository) : IBookService
             
         };
 
-        var createdBook = await bookRepository.AddAsync(book).ConfigureAwait(false);
+        Book? createdBook = await bookRepository.AddAsync(book).ConfigureAwait(false);
         return MapToBookDto(createdBook);
     }
 
@@ -46,7 +46,7 @@ public class BookService(IBookRepository bookRepository) : IBookService
             return null;
 
 
-        var book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
+        Book? book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
         if (book == null) return null;
 
         book.Title = updateBookDto.Title;
@@ -60,7 +60,7 @@ public class BookService(IBookRepository bookRepository) : IBookService
 
     public async Task<bool> DeleteBookAsync(int id)
     {
-        var book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
+        Book? book = await bookRepository.GetByIdAsync(id).ConfigureAwait(false);
         if (book == null) return false;
 
         await bookRepository.DeleteAsync(book).ConfigureAwait(false);
@@ -69,19 +69,19 @@ public class BookService(IBookRepository bookRepository) : IBookService
 
     public async Task<BookDto?> GetBookByIsbnAsync(string isbn)
     {
-        var book = await bookRepository.GetByIsbnAsync(isbn).ConfigureAwait(false);
+        Book? book = await bookRepository.GetByIsbnAsync(isbn).ConfigureAwait(false);
         return book == null ? null : MapToBookDto(book);
     }
 
     public async Task<IEnumerable<BookDto>> GetAvailableBooksAsync()
     {
-        var books = await bookRepository.GetAvailableBooksAsync().ConfigureAwait(false);
+        IEnumerable<Book> books = await bookRepository.GetAvailableBooksAsync().ConfigureAwait(false);
         return books.Select(MapToBookDto);
     }
 
     public async Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId)
     {
-        var books = await bookRepository.GetBooksByLibraryAsync(libraryId).ConfigureAwait(false);
+        IEnumerable<Book> books = await bookRepository.GetBooksByLibraryAsync(libraryId).ConfigureAwait(false);
         return books.Select(MapToBookDto);
     }
 
@@ -92,10 +92,9 @@ public class BookService(IBookRepository bookRepository) : IBookService
 
     public async Task<IEnumerable<BookDto>> GetBorrowedBooksByUserAsync(string userId)
     {
-        var books = await bookRepository.GetBorrowedBooksByUserAsync(userId).ConfigureAwait(false);
+        IEnumerable<Book> books = await bookRepository.GetBorrowedBooksByUserAsync(userId).ConfigureAwait(false);
         return books.Select(MapToBookDto);
     }
-
 
     private static BookDto MapToBookDto(Book book)
     {

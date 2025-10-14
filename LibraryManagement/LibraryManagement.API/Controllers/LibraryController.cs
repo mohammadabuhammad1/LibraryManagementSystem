@@ -1,189 +1,179 @@
 ﻿using LibraryManagement.API.Errors;
-using LibraryManagement.Application.Dtos.Book;
+using LibraryManagement.Application.Dtos.Books;
 using LibraryManagement.Application.Dtos.Libraries;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace LibraryManagement.API.Controllers
+namespace LibraryManagement.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+internal class LibrariesController(ILibraryRepository libraryRepository, IBookRepository bookRepository) : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
-    public class LibrariesController : ControllerBase
+    [HttpGet("GetAllLibraries")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [AllowAnonymous] 
+    public async Task<ActionResult<IEnumerable<LibraryDto>>> GetAllLibraries()
     {
-        private readonly ILibraryRepository _libraryRepository;
-        private readonly IBookRepository _bookRepository;
+        IEnumerable<Library> libraries = await libraryRepository.GetAllAsync().ConfigureAwait(false);
+        IEnumerable<LibraryDto> libraryDtos = libraries.Select(MapToLibraryDto);
+        return Ok(libraryDtos);
+    }
 
-        public LibrariesController(ILibraryRepository libraryRepository, IBookRepository bookRepository)
+    [HttpGet("GetLibraryById/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public async Task<ActionResult<LibraryDetailsDto>> GetLibraryById(int id)
+    {
+        Library? library = await libraryRepository.GetByIdAsync(id).ConfigureAwait(false);
+        if (library == null)
+            return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
+
+        IEnumerable<Book> books = await bookRepository.GetBooksByLibraryAsync(id).ConfigureAwait(false);
+
+        return Ok(MapToLibraryDetailsDto(library, books));
+    }
+    [HttpPost("CreateLibrary")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin")] 
+    public async Task<ActionResult<LibraryDto>> CreateLibrary([FromBody] CreateLibraryDto createLibraryDto)
+    {
+        try
         {
-            _libraryRepository = libraryRepository;
-            _bookRepository = bookRepository;
+            Library? existingLibrary = await libraryRepository.GetByNameAsync(createLibraryDto.Name).ConfigureAwait(false);
+            if (existingLibrary != null)
+                return BadRequest(new ApiResponse(400, $"Library with name '{createLibraryDto.Name}' already exists"));
+
+            var library = new Library
+            {
+                Name = createLibraryDto.Name,
+                Location = createLibraryDto.Location,
+                Description = createLibraryDto.Description
+            };
+
+            Library createdLibrary = await libraryRepository.AddAsync(library).ConfigureAwait(false);
+            return CreatedAtAction(nameof(GetLibraryById), new { id = createdLibrary.Id }, MapToLibraryDto(createdLibrary));
         }
-
-        [HttpGet("GetAllLibraries")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [AllowAnonymous] 
-        public async Task<ActionResult<IEnumerable<LibraryDto>>> GetAllLibraries()
+        catch (Exception ex)
         {
-            var libraries = await _libraryRepository.GetAllAsync();
-            var libraryDtos = libraries.Select(MapToLibraryDto);
-            return Ok(libraryDtos);
+            return BadRequest(new ApiResponse(400, ex.Message));
         }
+    }
 
-        [HttpGet("GetLibraryById/{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [AllowAnonymous]
-        public async Task<ActionResult<LibraryDetailsDto>> GetLibraryById(int id)
+    [HttpPut("UpdateLibrary/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Admin,Librarian")] 
+    public async Task<ActionResult<LibraryDto>> UpdateLibrary(int id, [FromBody] UpdateLibraryDto updateLibraryDto)
+    {
+        try
         {
-            var library = await _libraryRepository.GetByIdAsync(id);
+            Library? library = await libraryRepository.GetByIdAsync(id).ConfigureAwait(false);
             if (library == null)
                 return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
 
-            var books = await _bookRepository.GetBooksByLibraryAsync(id);
-            return Ok(MapToLibraryDetailsDto(library, books));
+            library.Name = updateLibraryDto.Name;
+            library.Location = updateLibraryDto.Location;
+            library.Description = updateLibraryDto.Description;
+
+            await libraryRepository.UpdateAsync(library).ConfigureAwait(false);
+            return Ok(MapToLibraryDto(library));
         }
-
-        [HttpPost("CreateLibrary")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin")] 
-        public async Task<ActionResult<LibraryDto>> CreateLibrary([FromBody] CreateLibraryDto createLibraryDto)
+        catch (Exception ex)
         {
-            try
-            {
-                var existingLibrary = await _libraryRepository.GetByNameAsync(createLibraryDto.Name);
-                if (existingLibrary != null)
-                    return BadRequest(new ApiResponse(400, $"Library with name '{createLibraryDto.Name}' already exists"));
-
-                var library = new Library
-                {
-                    Name = createLibraryDto.Name,
-                    Location = createLibraryDto.Location,
-                    Description = createLibraryDto.Description
-                };
-
-                var createdLibrary = await _libraryRepository.AddAsync(library);
-                return CreatedAtAction(nameof(GetLibraryById), new { id = createdLibrary.Id }, MapToLibraryDto(createdLibrary));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
+            return BadRequest(new ApiResponse(400, ex.Message));
         }
+    }
 
-        [HttpPut("UpdateLibrary/{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [Authorize(Roles = "Admin,Librarian")] 
-        public async Task<ActionResult<LibraryDto>> UpdateLibrary(int id, [FromBody] UpdateLibraryDto updateLibraryDto)
+    [HttpDelete("DeleteLibrary/{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "Admin")] 
+    public async Task<ActionResult> DeleteLibrary(int id)
+    {
+        Library? library = await libraryRepository.GetByIdAsync(id).ConfigureAwait(false);
+        if (library == null)
+            return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
+
+        IEnumerable<Book> books = await bookRepository.GetBooksByLibraryAsync(id).ConfigureAwait(false);
+        if (books.Any())
+            return BadRequest(new ApiResponse(400, "Cannot delete library that contains books"));
+
+        await libraryRepository.DeleteAsync(library).ConfigureAwait(false);
+        return NoContent();
+    }
+
+    [HttpPost("AddBookToLibrary/{libraryId}/{bookId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Admin,Librarian")] 
+    public async Task<ActionResult<BookDto>> AddBookToLibrary(int libraryId, int bookId)
+    {
+        try
         {
-            try
-            {
-                var library = await _libraryRepository.GetByIdAsync(id);
-                if (library == null)
-                    return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
-
-                library.Name = updateLibraryDto.Name;
-                library.Location = updateLibraryDto.Location;
-                library.Description = updateLibraryDto.Description;
-
-                await _libraryRepository.UpdateAsync(library);
-                return Ok(MapToLibraryDto(library));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
-        }
-
-        [HttpDelete("DeleteLibrary/{id}")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [Authorize(Roles = "Admin")] 
-        public async Task<ActionResult> DeleteLibrary(int id)
-        {
-            var library = await _libraryRepository.GetByIdAsync(id);
+            Library? library = await libraryRepository.GetByIdAsync(libraryId).ConfigureAwait(false);
             if (library == null)
-                return NotFound(new ApiResponse(404, $"Library with ID {id} not found"));
+                return NotFound(new ApiResponse(404, $"Library with ID {libraryId} not found"));
 
-            var books = await _bookRepository.GetBooksByLibraryAsync(id);
-            if (books.Any())
-                return BadRequest(new ApiResponse(400, "Cannot delete library that contains books"));
+            Book? book = await bookRepository.GetByIdAsync(bookId).ConfigureAwait(false);
+            if (book == null)
+                return NotFound(new ApiResponse(404, $"Book with ID {bookId} not found"));
 
-            await _libraryRepository.DeleteAsync(library);
-            return NoContent();
+            book.LibraryId = libraryId;
+            await bookRepository.UpdateAsync(book).ConfigureAwait(false);
+
+            return Ok(MapToBookDto(book));
         }
-
-        [HttpPost("AddBookToLibrary/{libraryId}/{bookId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        [Authorize(Roles = "Admin,Librarian")] 
-        public async Task<ActionResult<BookDto>> AddBookToLibrary(int libraryId, int bookId)
+        catch (Exception ex)
         {
-            try
-            {
-                var library = await _libraryRepository.GetByIdAsync(libraryId);
-                if (library == null)
-                    return NotFound(new ApiResponse(404, $"Library with ID {libraryId} not found"));
-
-                var book = await _bookRepository.GetByIdAsync(bookId);
-                if (book == null)
-                    return NotFound(new ApiResponse(404, $"Book with ID {bookId} not found"));
-
-                book.LibraryId = libraryId;
-                await _bookRepository.UpdateAsync(book);
-
-                return Ok(MapToBookDto(book));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse(400, ex.Message));
-            }
+            return BadRequest(new ApiResponse(400, ex.Message));
         }
+    }
 
-        private static LibraryDto MapToLibraryDto(Library library)
+    private static LibraryDto MapToLibraryDto(Library library)
+    {
+        return new LibraryDto
         {
-            return new LibraryDto
-            {
-                Id = library.Id,
-                Name = library.Name,
-                Location = library.Location,
-                Description = library.Description,
-                BookCount = library.Books?.Count ?? 0,
-                CreatedAt = library.CreatedAt
-            };
-        }
+            Id = library.Id,
+            Name = library.Name,
+            Location = library.Location,
+            Description = library.Description,
+            BookCount = library.Books?.Count ?? 0,
+            CreatedAt = library.CreatedAt
+        };
+    }
 
-        private static LibraryDetailsDto MapToLibraryDetailsDto(Library library, IEnumerable<Book> books)
+    private static LibraryDetailsDto MapToLibraryDetailsDto(Library library, IEnumerable<Book> books)
+    {
+        return new LibraryDetailsDto
         {
-            return new LibraryDetailsDto
-            {
-                Id = library.Id,
-                Name = library.Name,
-                Location = library.Location,
-                Description = library.Description,
-                Books = books.Select(MapToBookDto),
-                CreatedAt = library.CreatedAt
-            };
-        }
+            Id = library.Id,
+            Name = library.Name,
+            Location = library.Location,
+            Description = library.Description,
+            Books = books.Select(MapToBookDto),
+            CreatedAt = library.CreatedAt
+        };
+    }
 
-        private static BookDto MapToBookDto(Book book)
+    private static BookDto MapToBookDto(Book book)
+    {
+        return new BookDto
         {
-            return new BookDto
-            {
-                Id = book.Id,
-                Title = book.Title,
-                Author = book.Author,
-                ISBN = book.ISBN,
-                PublishedYear = book.PublishedYear,
-                TotalCopies = book.TotalCopies,
-                CopiesAvailable = book.CopiesAvailable,
-                LibraryId = book.LibraryId ?? 0
-            };
-        }
+            Id = book.Id,
+            Title = book.Title,
+            Author = book.Author,
+            ISBN = book.ISBN,
+            PublishedYear = book.PublishedYear,
+            TotalCopies = book.TotalCopies,
+            CopiesAvailable = book.CopiesAvailable,
+            LibraryId = book.LibraryId ?? 0
+        };
     }
 }

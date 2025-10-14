@@ -1,96 +1,91 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using LibraryManagement.Application.Interfaces;
+﻿using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
-namespace LibraryManagement.API.Services
+namespace LibraryManagement.API.Services;
+
+public class TokenService(IConfiguration config, UserManager<ApplicationUser> userManager) : ITokenService
 {
-    public class TokenService : ITokenService
+    private readonly SymmetricSecurityKey _key = new(
+        Encoding.UTF8.GetBytes(config["JwtSettings:Secret"]
+            ?? throw new ArgumentException("JWT Secret key is not configured"))
+    );
+
+    public async Task<string> CreateToken(ApplicationUser user)
     {
-        private readonly IConfiguration _config;
-        private readonly SymmetricSecurityKey _key;
-        private readonly UserManager<ApplicationUser> _userManager;
+        ArgumentNullException.ThrowIfNull(user);
 
-        public TokenService(IConfiguration config, UserManager<ApplicationUser> userManager)
+        List<Claim> claims = new()
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
+            new Claim(ClaimTypes.NameIdentifier, user.Id ?? string.Empty),
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+            new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
+            new Claim("membership_date", user.MembershipDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            new Claim("is_active", user.IsActive.ToString())
+        };
 
-            var secretKey = _config["JwtSettings:Secret"] ?? throw new ArgumentException("JWT Secret key is not configured");
-            _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+        IList<string> roles = await userManager.GetRolesAsync(user).ConfigureAwait(false);
+        foreach (string role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role ?? string.Empty));
         }
 
-        public async Task<string> CreateToken(ApplicationUser user)
+        SigningCredentials creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
+
+        SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
         {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddDays(7),
+            SigningCredentials = creds,
+            Issuer = config["JwtSettings:Issuer"] ?? "LibraryManagementAPI",
+            Audience = config["JwtSettings:Audience"] ?? "LibraryManagementUsers"
+        };
 
-            ArgumentNullException.ThrowIfNull(user);
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+        SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
 
-            var claims = new List<Claim>
+        return tokenHandler.WriteToken(token);
+    }
+
+    public async Task<string?> GetUserIdFromToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+
+        try
+        {
+            JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+
+            TokenValidationParameters validationParameters = new TokenValidationParameters
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
-                new Claim("membership_date", user.MembershipDate.ToString("yyyy-MM-dd")),
-                new Claim("is_active", user.IsActive.ToString())
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = _key,
+                ValidateIssuer = true,
+                ValidIssuer = config["JwtSettings:Issuer"] ?? "LibraryManagementAPI",
+                ValidateAudience = true,
+                ValidAudience = config["JwtSettings:Audience"] ?? "LibraryManagementUsers",
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(5)
             };
 
-            // Add user roles to claims
-            var roles = await _userManager.GetRolesAsync(user);
-            foreach (var role in roles)
+            TokenValidationResult result = await tokenHandler.ValidateTokenAsync(token, validationParameters).ConfigureAwait(false);
+
+            if (result.IsValid)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role ?? string.Empty));
+                return result.ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             }
 
-            var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.Now.AddDays(7),
-                SigningCredentials = creds,
-                Issuer = _config["JwtSettings:Issuer"] ?? "LibraryManagementAPI",
-                Audience = _config["JwtSettings:Audience"] ?? "LibraryManagementUsers"
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-
-            return tokenHandler.WriteToken(token);
+            return null;
         }
-
-        public async Task<string?> GetUserIdFromToken(string token)
+        catch (SecurityTokenException)
         {
-            if (string.IsNullOrEmpty(token))
-                return null;
-
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-
-                // Validate token 
-                var validationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = _key,
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = false 
-                };
-
-                var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-                var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-                return userId;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
+            return null;
         }
     }
 }

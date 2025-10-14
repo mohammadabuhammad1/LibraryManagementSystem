@@ -1,83 +1,76 @@
-﻿using LibraryManagement.Application.Dtos.Book;
+﻿using LibraryManagement.Application.Dtos.Books;
 using LibraryManagement.Application.Interfaces;
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Domain.Interfaces;
 
-namespace LibraryManagement.Application.Services
+namespace LibraryManagement.Application.Services;
+
+public class LibraryService(IBookRepository bookRepository) : ILibraryService
 {
-    public class LibraryService : ILibraryService
+    public async Task<BookDto> BorrowBookAsync(int bookId)
     {
-        private readonly IBookRepository _bookRepository;
-        private readonly ILibraryRepository _libraryRepository;
+        Book? book = await bookRepository.GetByIdAsync(bookId).ConfigureAwait(false);
 
-        public LibraryService(IBookRepository bookRepository, ILibraryRepository libraryRepository)
+        if (book == null)
+            throw new InvalidOperationException($"Book with ID {bookId} not found.");
+
+        if (book.CopiesAvailable <= 0)
+            throw new InvalidOperationException($"No copies available for book with ID {bookId}.");
+
+        book.CopiesAvailable--;
+        await bookRepository.UpdateAsync(book).ConfigureAwait(false);
+
+        return MapToBookDto(book);
+    }
+
+    public async Task<BookDto> ReturnBookAsync(int bookId)
+    {
+        Book? book = await bookRepository.GetByIdAsync(bookId).ConfigureAwait(false);
+        if (book == null)
+            throw new InvalidOperationException($"Book with ID {bookId} not found.");
+
+        if (book.CopiesAvailable >= book.TotalCopies)
+            throw new InvalidOperationException($"'{book.Title}' is not currently borrowed.");
+
+        book.CopiesAvailable++;
+        await bookRepository.UpdateAsync(book).ConfigureAwait(false);
+
+        return MapToBookDto(book);
+    }
+
+    public async Task<IEnumerable<BookDto>> GetAvailableBooksAsync()
+    {
+        IEnumerable<Book> books = await bookRepository.GetAvailableBooksAsync().ConfigureAwait(false);
+        return books.Select(MapToBookDto);
+    }
+
+    public async Task<IEnumerable<BookDto>> GetBorrowedBooksAsync()
+    {
+        IEnumerable<Book> allBooks = await bookRepository.GetAllAsync().ConfigureAwait(false);
+
+        IEnumerable<Book> borrowedBooks = allBooks.Where(book => book.CopiesAvailable < book.TotalCopies);
+
+        return borrowedBooks.Select(MapToBookDto);
+    }
+
+    public async Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId)
+    {
+        IEnumerable<Book> books = await bookRepository.GetBooksByLibraryAsync(libraryId).ConfigureAwait(false);
+        return books.Select(MapToBookDto);
+    }
+
+    private static BookDto MapToBookDto(Book book)
+    {
+        return new BookDto
         {
-            _bookRepository = bookRepository;
-            _libraryRepository = libraryRepository;
-        }
-
-        public async Task<BookDto> BorrowBookAsync(int bookId)
-        {
-            var book = await _bookRepository.GetByIdAsync(bookId);
-            if (book == null)
-                throw new Exception($"Book with ID {bookId} not found.");
-
-            if (book.CopiesAvailable <= 0)
-                throw new Exception($"No copies available for book with ID {bookId}.");
-
-            book.CopiesAvailable--;
-            await _bookRepository.UpdateAsync(book);
-
-            return MapToBookDto(book);
-        }
-
-        public async Task<BookDto> ReturnBookAsync(int bookId)
-        {
-            var book = await _bookRepository.GetByIdAsync(bookId);
-            if (book == null)
-                throw new Exception($"Book with ID {bookId} not found.");
-
-            if (book.CopiesAvailable >= book.TotalCopies)
-                throw new Exception($"'{book.Title}' is not currently borrowed.");
-
-            book.CopiesAvailable++;
-            await _bookRepository.UpdateAsync(book);
-
-            return MapToBookDto(book);
-        }
-
-        public async Task<IEnumerable<BookDto>> GetAvailableBooksAsync()
-        {
-            var books = await _bookRepository.GetAvailableBooksAsync();
-            return books.Select(MapToBookDto);
-        }
-
-        public async Task<IEnumerable<BookDto>> GetBorrowedBooksAsync()
-        {
-            var allBooks = await _bookRepository.GetAllAsync();
-            var borrowedBooks = allBooks.Where(book => book.CopiesAvailable < book.TotalCopies);
-            return borrowedBooks.Select(MapToBookDto);
-        }
-
-        public async Task<IEnumerable<BookDto>> GetBooksByLibraryAsync(int libraryId)
-        {
-            var books = await _bookRepository.GetBooksByLibraryAsync(libraryId);
-            return books.Select(MapToBookDto);
-        }
-
-        private static BookDto MapToBookDto(Book book)
-        {
-            return new BookDto
-            {
-                Id = book.Id,
-                Title = book.Title,
-                Author = book.Author,
-                ISBN = book.ISBN,
-                PublishedYear = book.PublishedYear,
-                TotalCopies = book.TotalCopies,
-                CopiesAvailable = book.CopiesAvailable,
-                LibraryId = (int)book.LibraryId
-            };
-        }
+            Id = book.Id,
+            Title = book.Title,
+            Author = book.Author,
+            ISBN = book.ISBN,
+            PublishedYear = book.PublishedYear,
+            TotalCopies = book.TotalCopies,
+            CopiesAvailable = book.CopiesAvailable,
+            LibraryId = book.LibraryId ?? 0
+        };
     }
 }

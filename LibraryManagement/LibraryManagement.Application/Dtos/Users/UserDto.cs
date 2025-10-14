@@ -1,4 +1,7 @@
-﻿public class UserDto
+﻿using System.Collections.ObjectModel;
+
+namespace LibraryManagement.Application.Dtos.Users;
+public class UserDto
 {
     public string Id { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
@@ -12,5 +15,5 @@
     public int OverdueBooks { get; set; }
     public decimal TotalFines { get; set; }
 
-    public List<string> Roles { get; set; } = new List<string>();
+    public Collection<string> Roles { get;  } = [];
 }

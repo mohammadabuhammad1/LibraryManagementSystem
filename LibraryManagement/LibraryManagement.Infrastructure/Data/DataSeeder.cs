@@ -2,127 +2,145 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace LibraryManagement.Infrastructure.Data
+namespace LibraryManagement.Infrastructure.Data;
+
+public partial class DataSeeder(LibraryDbContext context, ILogger<DataSeeder> logger)
 {
-    public class DataSeeder
+    // LoggerMessage delegates for high-performance logging
+    private static readonly Action<ILogger, Exception?> _databaseSeededSuccessfully =
+        LoggerMessage.Define(LogLevel.Information, new EventId(1, "DatabaseSeeded"), "Database seeded with initial data successfully.");
+
+    private static readonly Action<ILogger, string, Exception?> _seedingError =
+        LoggerMessage.Define<string>(LogLevel.Error, new EventId(2, "SeedingError"), "An error occurred while seeding the database: {ErrorMessage}");
+
+    private static readonly Action<ILogger, Exception?> _librariesSeeded =
+        LoggerMessage.Define(LogLevel.Information, new EventId(3, "LibrariesSeeded"), "Libraries seeded successfully.");
+
+    private static readonly Action<ILogger, Exception?> _booksSeeded =
+        LoggerMessage.Define(LogLevel.Information, new EventId(4, "BooksSeeded"), "Books seeded successfully.");
+
+    private static readonly Action<ILogger, Exception?> _borrowRecordsSeeded =
+        LoggerMessage.Define(LogLevel.Information, new EventId(5, "BorrowRecordsSeeded"), "Borrow records seeded successfully.");
+
+    public async Task SeedAsync()
     {
-        private readonly LibraryDbContext _context;
-        private readonly ILogger<DataSeeder> _logger;
-
-        public DataSeeder(LibraryDbContext context, ILogger<DataSeeder> logger)
+        try
         {
-            _context = context;
-            _logger = logger;
+            await SeedLibrariesAsync().ConfigureAwait(false);
+            await SeedBooksAsync().ConfigureAwait(false);
+            await SeedBorrowRecordsAsync().ConfigureAwait(false);
+            _databaseSeededSuccessfully(logger, null);
         }
-
-        public async Task SeedAsync()
+        catch (DbUpdateException dbEx)
         {
-            try
-            {
-                await SeedLibrariesAsync();
-                await SeedBooksAsync();
-                await SeedBorrowRecordsAsync();
-                _logger.LogInformation("Database seeded with initial data successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while seeding the database.");
-            }
+            // ✓ Specific exception for database update errors
+            _seedingError(logger, dbEx.Message, dbEx);
         }
-
-        private async Task SeedLibrariesAsync()
+        catch (InvalidOperationException invalidOpEx)
         {
-            if (!await _context.Libraries.AnyAsync())
+            // ✓ Specific exception for invalid operations (e.g., missing dependencies)
+            _seedingError(logger, invalidOpEx.Message, invalidOpEx);
+        }
+        catch (Exception ex)
+        {
+            // ✓ Generic exception as fallback
+            _seedingError(logger, ex.Message, ex);
+            throw; // ✓ Re-throw to indicate seeding failure
+        }
+    }
+
+    private async Task SeedLibrariesAsync()
+    {
+        if (!await context.Libraries.AnyAsync().ConfigureAwait(false))
+        {
+            List<Library> libraries = new() 
             {
-                var libraries = new List<Library>
+                new()
                 {
-                    new Library
+                    Name = "Central Library",
+                    Location = "Main Street",
+                    Description = "A hub for book lovers",
+                    CreatedAt = DateTime.UtcNow
+                },
+                new()
+                {
+                    Name = "Downtown Branch",
+                    Location = "Downtown",
+                    Description = "A small branch offering study space",
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+
+            await context.Libraries.AddRangeAsync(libraries).ConfigureAwait(false);
+            await context.SaveChangesAsync().ConfigureAwait(false);
+            _librariesSeeded(logger, null);
+        }
+    }
+
+    private async Task SeedBooksAsync()
+    {
+        if (!await context.Books.AnyAsync().ConfigureAwait(false))
+        {
+            Library? library = await context.Libraries.FirstOrDefaultAsync().ConfigureAwait(false);  
+            if (library != null)
+            {
+                List<Book> books = new()  
+                {
+                    new()
                     {
-                        Name = "Central Library",
-                        Location = "Main Street",
-                        Description = "A hub for book lovers",
+                        Title = "To Kill a Mockingbird",
+                        Author = "Harper Lee",
+                        ISBN = "9780061120084",
+                        PublishedYear = 1960,
+                        TotalCopies = 10,
+                        CopiesAvailable = 10,
+                        LibraryId = library.Id,
                         CreatedAt = DateTime.UtcNow
                     },
-                    new Library
+                    new()
                     {
-                        Name = "Downtown Branch",
-                        Location = "Downtown",
-                        Description = "A small branch offering study space",
+                        Title = "1984",
+                        Author = "George Orwell",
+                        ISBN = "9780451524935",
+                        PublishedYear = 1949,
+                        TotalCopies = 5,
+                        CopiesAvailable = 5,
+                        LibraryId = library.Id,
                         CreatedAt = DateTime.UtcNow
                     }
                 };
 
-                await _context.Libraries.AddRangeAsync(libraries);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Libraries seeded successfully.");
+                await context.Books.AddRangeAsync(books).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+                _booksSeeded(logger, null);
             }
         }
+    }
 
-        private async Task SeedBooksAsync()
+    private async Task SeedBorrowRecordsAsync()
+    {
+        if (!await context.BorrowRecords.AnyAsync().ConfigureAwait(false))
         {
-            if (!await _context.Books.AnyAsync())
+            ApplicationUser? user = await context.Users.FirstOrDefaultAsync().ConfigureAwait(false);  
+            Book? book = await context.Books.FirstOrDefaultAsync().ConfigureAwait(false);  
+
+            if (user != null && book != null)
             {
-                var library = await _context.Libraries.FirstOrDefaultAsync();
-                if (library != null)
+                BorrowRecord borrowRecord = new()  
                 {
-                    var books = new List<Book>
-                    {
-                        new Book
-                        {
-                            Title = "To Kill a Mockingbird",
-                            Author = "Harper Lee",
-                            ISBN = "9780061120084",
-                            PublishedYear = 1960,
-                            TotalCopies = 10,
-                            CopiesAvailable = 10,
-                            LibraryId = library.Id,
-                            CreatedAt = DateTime.UtcNow
-                        },
-                        new Book
-                        {
-                            Title = "1984",
-                            Author = "George Orwell",
-                            ISBN = "9780451524935",
-                            PublishedYear = 1949,
-                            TotalCopies = 5,
-                            CopiesAvailable = 5,
-                            LibraryId = library.Id,
-                            CreatedAt = DateTime.UtcNow
-                        }
-                    };
+                    BookId = book.Id,
+                    UserId = user.Id,
+                    BorrowDate = DateTime.UtcNow,
+                    DueDate = DateTime.UtcNow.AddDays(14),
+                    ReturnDate = null,
+                    FineAmount = 0,
+                    Notes = "First Borrow",
+                    CreatedAt = DateTime.UtcNow
+                };
 
-                    await _context.Books.AddRangeAsync(books);
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("Books seeded successfully.");
-                }
-            }
-        }
-
-        private async Task SeedBorrowRecordsAsync()
-        {
-            if (!await _context.BorrowRecords.AnyAsync())
-            {
-                var user = await _context.Users.FirstOrDefaultAsync();
-                var book = await _context.Books.FirstOrDefaultAsync();
-
-                if (user != null && book != null)
-                {
-                    var borrowRecord = new BorrowRecord
-                    {
-                        BookId = book.Id,
-                        UserId = user.Id,
-                        BorrowDate = DateTime.UtcNow,
-                        DueDate = DateTime.UtcNow.AddDays(14),
-                        ReturnDate = null,
-                        FineAmount = 0,
-                        Notes = "First Borrow",
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    await _context.BorrowRecords.AddAsync(borrowRecord);
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("Borrow records seeded successfully.");
-                }
+                await context.BorrowRecords.AddAsync(borrowRecord).ConfigureAwait(false);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+                _borrowRecordsSeeded(logger, null);
             }
         }
     }
